@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Start Redis
+        run: docker run -d --name redis-test -p 6379:6379 bitnami/redis:6.2
+
+      - name: Run tests
+        env:
+          REDIS_URL: "redis://localhost:6379"
+        run: make testacc

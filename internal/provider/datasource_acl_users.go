@@ -22,7 +22,7 @@ func NewACLUsersDataSource() datasource.DataSource {
 
 // ACLUsersDataSource defines the data source implementation.
 type ACLUsersDataSource struct {
-	client redis.UniversalClient
+	redisClient *RedisClient
 }
 
 // ACLUsersDataSourceModel describes the data source data model.
@@ -81,16 +81,16 @@ func (d *ACLUsersDataSource) Configure(ctx context.Context, req datasource.Confi
 		return
 	}
 
-	client, ok := req.ProviderData.(redis.UniversalClient)
+	redisClient, ok := req.ProviderData.(*RedisClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected redis.UniversalClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *RedisClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
 
-	d.client = client
+	d.redisClient = redisClient
 }
 
 func (d *ACLUsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -103,14 +103,10 @@ func (d *ACLUsersDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	usernamesCmd := redis.NewStringSliceCmd(ctx, "ACL", "USERS")
-	err := d.client.Process(ctx, usernamesCmd)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to list ACL users, got error: %s", err))
-		return
-	}
+	d.redisClient.mutex.Lock()
+	defer d.redisClient.mutex.Unlock()
 
-	usernames, err := usernamesCmd.Result()
+	usernames, err := d.redisClient.client.Do(ctx, "ACL", "USERS").StringSlice()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to list ACL users, got error: %s", err))
 		return
@@ -118,15 +114,28 @@ func (d *ACLUsersDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 	data.Users = []ACLUserDataSourceModel{}
 	for _, username := range usernames {
-		userCmd := redis.NewSliceCmd(ctx, "ACL", "GETUSER", username)
-		err := d.client.Process(ctx, userCmd)
+		result, err := d.redisClient.client.Do(ctx, "ACL", "GETUSER", username).Result()
 		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get ACL user %s, got error: %s", username, err))
+			if err != redis.Nil {
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get ACL user %s, got error: %s", username, err))
+			}
 			continue
 		}
 
-		userVal, err := userCmd.Result()
-		if err != nil || len(userVal) == 0 {
+		var userVal []interface{}
+		switch res := result.(type) {
+		case []interface{}:
+			userVal = res
+		case map[interface{}]interface{}:
+			for k, v := range res {
+				userVal = append(userVal, k, v)
+			}
+		default:
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to parse ACL GETUSER response for user %s: unexpected type %T", username, result))
+			continue
+		}
+
+		if len(userVal) == 0 {
 			continue
 		}
 

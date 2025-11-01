@@ -101,28 +101,40 @@ func (d *ACLUserDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	val, err := d.client.Do(ctx, "ACL", "GETUSER", data.Name.ValueString()).Result()
+	cmd := redis.NewSliceCmd(ctx, "ACL", "GETUSER", data.Name.ValueString())
+	err := d.client.Process(ctx, cmd)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read ACL user, got error: %s", err))
+		// Check for redis.Nil here
+		if err == redis.Nil {
+			// For a data source, not finding the user IS an error
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("ACL user %s not found", data.Name.ValueString()))
+			return
+		}
+		// It's a different, unexpected error
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to process ACL GETUSER command, got error: %s", err))
 		return
 	}
 
-	if val == nil {
+	val, err := cmd.Result()
+	if err == redis.Nil || len(val) == 0 {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("ACL user %s not found", data.Name.ValueString()))
 		return
 	}
-
-	aclUserResourceModel := &ACLUserResourceModel{}
-	parseACLUser(val.(string), aclUserResourceModel, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read ACL user result, got error: %s", err))
 		return
 	}
 
-	data.Enabled = aclUserResourceModel.Enabled
-	data.Keys = aclUserResourceModel.Keys
-	data.Channels = aclUserResourceModel.Channels
-	data.Commands = aclUserResourceModel.Commands
-	data.Selectors = aclUserResourceModel.Selectors
+	temp := &ACLUserResourceModel{}
+	parseACLUser(val, temp, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	data.Enabled = temp.Enabled
+	data.Keys = temp.Keys
+	data.Channels = temp.Channels
+	data.Commands = temp.Commands
+	data.Selectors = temp.Selectors
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

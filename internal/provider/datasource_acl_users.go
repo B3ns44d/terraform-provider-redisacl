@@ -103,28 +103,46 @@ func (d *ACLUsersDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	users, err := d.client.ACLList(ctx).Result()
+	usernamesCmd := redis.NewStringSliceCmd(ctx, "ACL", "USERS")
+	err := d.client.Process(ctx, usernamesCmd)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to list ACL users, got error: %s", err))
+		return
+	}
+
+	usernames, err := usernamesCmd.Result()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to list ACL users, got error: %s", err))
 		return
 	}
 
 	data.Users = []ACLUserDataSourceModel{}
-	for _, userStr := range users {
-		aclUserResourceModel := &ACLUserResourceModel{}
-		parseACLUser(userStr, aclUserResourceModel, &resp.Diagnostics)
+	for _, username := range usernames {
+		userCmd := redis.NewSliceCmd(ctx, "ACL", "GETUSER", username)
+		err := d.client.Process(ctx, userCmd)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get ACL user %s, got error: %s", username, err))
+			continue
+		}
+
+		userVal, err := userCmd.Result()
+		if err != nil || len(userVal) == 0 {
+			continue
+		}
+
+		var userModel ACLUserDataSourceModel
+		userModel.Name = types.StringValue(username)
+		temp := &ACLUserResourceModel{}
+		parseACLUser(userVal, temp, &resp.Diagnostics)
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		userModel.Enabled = temp.Enabled
+		userModel.Keys = temp.Keys
+		userModel.Channels = temp.Channels
+		userModel.Commands = temp.Commands
+		userModel.Selectors = temp.Selectors
 
-		userModel := ACLUserDataSourceModel{
-			Name:     aclUserResourceModel.Name,
-			Enabled:  aclUserResourceModel.Enabled,
-			Keys:     aclUserResourceModel.Keys,
-			Channels: aclUserResourceModel.Channels,
-			Commands: aclUserResourceModel.Commands,
-			Selectors: aclUserResourceModel.Selectors,
-		}
 		data.Users = append(data.Users, userModel)
 	}
 

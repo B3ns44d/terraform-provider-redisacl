@@ -63,19 +63,19 @@ func (r *ACLUserResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Sensitive:           true,
 			},
 			"keys": schema.StringAttribute{
-				MarkdownDescription: "The key patterns the user has access to.",
+				MarkdownDescription: "The key patterns the user has access to (space-separated if multiple).",
 				Optional:            true,
 			},
 			"channels": schema.StringAttribute{
-				MarkdownDescription: "The channel patterns the user has access to.",
+				MarkdownDescription: "The channel patterns the user has access to (space-separated if multiple).",
 				Optional:            true,
 			},
 			"commands": schema.StringAttribute{
-				MarkdownDescription: "The commands the user can execute.",
+				MarkdownDescription: "The commands the user can execute (space-separated).",
 				Optional:            true,
 			},
 			"selectors": schema.ListAttribute{
-				MarkdownDescription: "A list of selectors for the user.",
+				MarkdownDescription: "A list of selectors for the user (each a string of space-separated rules).",
 				ElementType:         types.StringType,
 				Optional:            true,
 			},
@@ -108,60 +108,75 @@ func (r *ACLUserResource) Configure(ctx context.Context, req resource.ConfigureR
 func (r *ACLUserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data ACLUserResourceModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	args := buildACLSetUserArgs(&data)
+	rules := buildACLSetUserRules(&data)
 
-	err := r.client.Do(ctx, args...).Err()
+	err := r.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create ACL user, got error: %s", err))
 		return
 	}
 
-	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ACLUserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data ACLUserResourceModel
 
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	val, err := r.client.Do(ctx, "ACL", "GETUSER", data.Name.ValueString()).Result()
+	cmd := redis.NewSliceCmd(ctx, "ACL", "GETUSER", data.Name.ValueString())
+
+	err := r.client.Process(ctx, cmd)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read ACL user, got error: %s", err))
+		// Check for redis.Nil here
+		if err == redis.Nil {
+			// User does not exist, so we tell Terraform to remove it from state
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		// It's a different, unexpected error
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to process ACL GETUSER command, got error: %s", err))
 		return
 	}
 
-	if val == nil {
-		// User does not exist
+	val, err := cmd.Result()
+	if err != nil {
+		// This check is now secondary, but good to keep as a safeguard
+		if err == redis.Nil {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read ACL user result, got error: %s", err))
+		return
+	}
+
+	if len(val) == 0 {
+		// Safety check
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	parseACLUser(val.(string), &data, &resp.Diagnostics)
+	parseACLUser(val, &data, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ACLUserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data ACLUserResourceModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -170,33 +185,33 @@ func (r *ACLUserResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	// Check for self-mutation
 	if !data.AllowSelfMutation.ValueBool() {
-		currentUser, err := r.client.Do(ctx, "ACL", "WHOAMI").Result()
+		cmd := redis.NewStringCmd(ctx, "ACL", "WHOAMI")
+		err := r.client.Do(ctx, cmd)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get current user, got error: %s", err))
 			return
 		}
-		if currentUser.(string) == data.Name.ValueString() {
+		currentUser := cmd.Val()
+		if currentUser == data.Name.ValueString() {
 			resp.Diagnostics.AddError("Self-Mutation Error", "Cannot modify the currently authenticated user without setting allow_self_mutation to true")
 			return
 		}
 	}
 
-	args := buildACLSetUserArgs(&data)
+	rules := buildACLSetUserRules(&data)
 
-	err := r.client.Do(ctx, args...).Err()
+	err := r.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update ACL user, got error: %s", err))
 		return
 	}
 
-	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ACLUserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data ACLUserResourceModel
 
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -205,18 +220,20 @@ func (r *ACLUserResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	// Check for self-mutation
 	if !data.AllowSelfMutation.ValueBool() {
-		currentUser, err := r.client.Do(ctx, "ACL", "WHOAMI").Result()
+		cmd := redis.NewStringCmd(ctx, "ACL", "WHOAMI")
+		err := r.client.Do(ctx, cmd)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get current user, got error: %s", err))
 			return
 		}
-		if currentUser.(string) == data.Name.ValueString() {
+		currentUser := cmd.Val()
+		if currentUser == data.Name.ValueString() {
 			resp.Diagnostics.AddError("Self-Mutation Error", "Cannot delete the currently authenticated user without setting allow_self_mutation to true")
 			return
 		}
 	}
 
-	err := r.client.Do(ctx, "ACL", "DELUSER", data.Name.ValueString()).Err()
+	err := r.client.ACLDelUser(ctx, data.Name.ValueString()).Err()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete ACL user, got error: %s", err))
 		return

@@ -69,7 +69,11 @@ func parseACLUser(acl []interface{}, data *ACLUserResourceModel, diags *diag.Dia
 	data.Enabled = types.BoolValue(false)
 
 	for i := 0; i < len(acl); i += 2 {
-		key := acl[i].(string)
+		key, ok := acl[i].(string)
+		if !ok {
+			diags.AddError("Parse Error", "ACL key is not a string")
+			return
+		}
 		v := acl[i+1]
 
 		switch key {
@@ -94,7 +98,12 @@ func parseACLUser(acl []interface{}, data *ACLUserResourceModel, diags *diag.Dia
 			case []interface{}:
 				var parts []string
 				for _, p := range vv {
-					parts = append(parts, p.(string))
+					part, ok := p.(string)
+					if !ok {
+						diags.AddError("Parse Error", "key part is not a string")
+						return
+					}
+					parts = append(parts, part)
 				}
 				keyStr = strings.Join(parts, " ")
 			default:
@@ -110,7 +119,12 @@ func parseACLUser(acl []interface{}, data *ACLUserResourceModel, diags *diag.Dia
 			case []interface{}:
 				var parts []string
 				for _, p := range vv {
-					parts = append(parts, p.(string))
+					part, ok := p.(string)
+					if !ok {
+						diags.AddError("Parse Error", "channel part is not a string")
+						return
+					}
+					parts = append(parts, part)
 				}
 				chanStr = strings.Join(parts, " ")
 			default:
@@ -140,7 +154,11 @@ func parseACLUser(acl []interface{}, data *ACLUserResourceModel, diags *diag.Dia
 				}
 				var parts []string
 				for j := 0; j < len(sel); j += 2 {
-					sk := sel[j].(string)
+					sk, ok := sel[j].(string)
+					if !ok {
+						diags.AddError("Parse Error", "selector key is not a string")
+						return
+					}
 					svI := sel[j+1]
 					var sv string
 					switch svv := svI.(type) {
@@ -149,7 +167,12 @@ func parseACLUser(acl []interface{}, data *ACLUserResourceModel, diags *diag.Dia
 					case []interface{}:
 						var pp []string
 						for _, ppp := range svv {
-							pp = append(pp, ppp.(string))
+							part, ok := ppp.(string)
+							if !ok {
+								diags.AddError("Parse Error", "selector value part is not a string")
+								return
+							}
+							pp = append(pp, part)
 						}
 						sv = strings.Join(pp, " ")
 					default:

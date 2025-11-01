@@ -24,7 +24,7 @@ func NewACLUserResource() resource.Resource {
 
 // ACLUserResource defines the resource implementation.
 type ACLUserResource struct {
-	client redis.UniversalClient
+	redisClient *RedisClient
 }
 
 // ACLUserResourceModel describes the resource data model.
@@ -93,16 +93,16 @@ func (r *ACLUserResource) Configure(ctx context.Context, req resource.ConfigureR
 		return
 	}
 
-	client, ok := req.ProviderData.(redis.UniversalClient)
+	redisClient, ok := req.ProviderData.(*RedisClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected redis.UniversalClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *RedisClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
 
-	r.client = client
+	r.redisClient = redisClient
 }
 
 func (r *ACLUserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -116,7 +116,7 @@ func (r *ACLUserResource) Create(ctx context.Context, req resource.CreateRequest
 
 	rules := buildACLSetUserRules(&data)
 
-	err := r.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
+	err := r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create ACL user, got error: %s", err))
 		return
@@ -134,24 +134,11 @@ func (r *ACLUserResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	cmd := redis.NewSliceCmd(ctx, "ACL", "GETUSER", data.Name.ValueString())
+	r.redisClient.mutex.Lock()
+	defer r.redisClient.mutex.Unlock()
 
-	err := r.client.Process(ctx, cmd)
+	result, err := r.redisClient.client.Do(ctx, "ACL", "GETUSER", data.Name.ValueString()).Result()
 	if err != nil {
-		// Check for redis.Nil here
-		if err == redis.Nil {
-			// User does not exist, so we tell Terraform to remove it from state
-			resp.State.RemoveResource(ctx)
-			return
-		}
-		// It's a different, unexpected error
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to process ACL GETUSER command, got error: %s", err))
-		return
-	}
-
-	val, err := cmd.Result()
-	if err != nil {
-		// This check is now secondary, but good to keep as a safeguard
 		if err == redis.Nil {
 			resp.State.RemoveResource(ctx)
 			return
@@ -160,8 +147,20 @@ func (r *ACLUserResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	var val []interface{}
+	switch res := result.(type) {
+	case []interface{}:
+		val = res
+	case map[interface{}]interface{}:
+		for k, v := range res {
+			val = append(val, k, v)
+		}
+	default:
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to parse ACL GETUSER response: unexpected type %T", result))
+		return
+	}
+
 	if len(val) == 0 {
-		// Safety check
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -186,7 +185,7 @@ func (r *ACLUserResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Check for self-mutation
 	if !data.AllowSelfMutation.ValueBool() {
 		cmd := redis.NewStringCmd(ctx, "ACL", "WHOAMI")
-		err := r.client.Do(ctx, cmd)
+		err := r.redisClient.client.Do(ctx, cmd)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get current user, got error: %s", err))
 			return
@@ -200,7 +199,7 @@ func (r *ACLUserResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	rules := buildACLSetUserRules(&data)
 
-	err := r.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
+	err := r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update ACL user, got error: %s", err))
 		return
@@ -221,7 +220,7 @@ func (r *ACLUserResource) Delete(ctx context.Context, req resource.DeleteRequest
 	// Check for self-mutation
 	if !data.AllowSelfMutation.ValueBool() {
 		cmd := redis.NewStringCmd(ctx, "ACL", "WHOAMI")
-		err := r.client.Do(ctx, cmd)
+		err := r.redisClient.client.Do(ctx, cmd)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get current user, got error: %s", err))
 			return
@@ -233,7 +232,7 @@ func (r *ACLUserResource) Delete(ctx context.Context, req resource.DeleteRequest
 		}
 	}
 
-	err := r.client.ACLDelUser(ctx, data.Name.ValueString()).Err()
+	err := r.redisClient.client.ACLDelUser(ctx, data.Name.ValueString()).Err()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete ACL user, got error: %s", err))
 		return

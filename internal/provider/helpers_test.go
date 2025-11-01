@@ -15,14 +15,19 @@ import (
 func TestParseACLUser(t *testing.T) {
 	tests := []struct {
 		name     string
-		acl      string
+		acl      []interface{}
 		expected *ACLUserResourceModel
 	}{
 		{
 			name: "simple user",
-			acl:  "myuser on ~* &* +@all",
+			acl: []interface{}{
+				"flags", []interface{}{"on"},
+				"passwords", []interface{}{},
+				"keys", "~*",
+				"channels", "&*",
+				"commands", "+@all",
+			},
 			expected: &ACLUserResourceModel{
-				Name:     types.StringValue("myuser"),
 				Enabled:  types.BoolValue(true),
 				Keys:     types.StringValue("~*"),
 				Channels: types.StringValue("&*"),
@@ -31,9 +36,14 @@ func TestParseACLUser(t *testing.T) {
 		},
 		{
 			name: "disabled user",
-			acl:  "anotheruser off ~somekey &somechannel -@all",
+			acl: []interface{}{
+				"flags", []interface{}{"off"},
+				"passwords", []interface{}{},
+				"keys", "~somekey",
+				"channels", "&somechannel",
+				"commands", "-@all",
+			},
 			expected: &ACLUserResourceModel{
-				Name:     types.StringValue("anotheruser"),
 				Enabled:  types.BoolValue(false),
 				Keys:     types.StringValue("~somekey"),
 				Channels: types.StringValue("&somechannel"),
@@ -42,9 +52,17 @@ func TestParseACLUser(t *testing.T) {
 		},
 		{
 			name: "user with selectors",
-			acl:  "selectoruser on (somecommand) ~* &* +@all",
+			acl: []interface{}{
+				"flags", []interface{}{"on"},
+				"passwords", []interface{}{},
+				"keys", "~*",
+				"channels", "&*",
+				"commands", "+@all",
+				"selectors", []interface{}{
+					[]interface{}{"commands", "somecommand"},
+				},
+			},
 			expected: &ACLUserResourceModel{
-				Name:      types.StringValue("selectoruser"),
 				Enabled:   types.BoolValue(true),
 				Keys:      types.StringValue("~*"),
 				Channels:  types.StringValue("&*"),
@@ -61,7 +79,6 @@ func TestParseACLUser(t *testing.T) {
 			parseACLUser(tt.acl, actual, &diags)
 
 			assert.Empty(t, diags)
-			assert.Equal(t, tt.expected.Name, actual.Name)
 			assert.Equal(t, tt.expected.Enabled, actual.Enabled)
 			assert.Equal(t, tt.expected.Keys, actual.Keys)
 			assert.Equal(t, tt.expected.Channels, actual.Channels)

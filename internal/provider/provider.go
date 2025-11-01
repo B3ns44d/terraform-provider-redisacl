@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -18,6 +19,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/redis/go-redis/v9"
 )
+
+// This is the struct we'll pass to datasources and resources.
+type RedisClient struct {
+	client redis.UniversalClient
+	mutex  *sync.Mutex
+}
 
 // Ensure RedisACLProvider satisfies various provider interfaces.
 var _ provider.Provider = &RedisACLProvider{}
@@ -250,8 +257,12 @@ func (p *RedisACLProvider) Configure(ctx context.Context, req provider.Configure
 		resp.Diagnostics.AddError("Client Configuration", fmt.Sprintf("Unable to connect to Redis: %s", err))
 		return
 	}
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	redisClient := &RedisClient{
+		client: client,
+		mutex:  &sync.Mutex{},
+	}
+	resp.DataSourceData = redisClient
+	resp.ResourceData = redisClient
 }
 
 func (p *RedisACLProvider) Resources(ctx context.Context) []func() resource.Resource {

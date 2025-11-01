@@ -22,7 +22,7 @@ func NewACLUserDataSource() datasource.DataSource {
 
 // ACLUserDataSource defines the data source implementation.
 type ACLUserDataSource struct {
-	client redis.UniversalClient
+	redisClient *RedisClient
 }
 
 // ACLUserDataSourceModel describes the data source data model.
@@ -79,16 +79,16 @@ func (d *ACLUserDataSource) Configure(ctx context.Context, req datasource.Config
 		return
 	}
 
-	client, ok := req.ProviderData.(redis.UniversalClient)
+	redisClient, ok := req.ProviderData.(*RedisClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected redis.UniversalClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *RedisClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
 
-	d.client = client
+	d.redisClient = redisClient
 }
 
 func (d *ACLUserDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -101,28 +101,37 @@ func (d *ACLUserDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	cmd := redis.NewSliceCmd(ctx, "ACL", "GETUSER", data.Name.ValueString())
-	err := d.client.Process(ctx, cmd)
+	d.redisClient.mutex.Lock()
+	defer d.redisClient.mutex.Unlock()
+
+	// This is reworked to use Do instead of Process to avoid a race condition when a
+	// resource and data source of the same type are used in the same configuration.
+	// The result from ACL GETUSER can be a map, so we read it as such and convert
+	// to the flat slice our parser expects.
+	result, err := d.redisClient.client.Do(ctx, "ACL", "GETUSER", data.Name.ValueString()).Result()
 	if err != nil {
-		// Check for redis.Nil here
 		if err == redis.Nil {
-			// For a data source, not finding the user IS an error
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("ACL user %s not found", data.Name.ValueString()))
 			return
 		}
-		// It's a different, unexpected error
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to process ACL GETUSER command, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read ACL user result, got error: %s", err))
 		return
 	}
 
-	val, err := cmd.Result()
-	if err == redis.Nil || len(val) == 0 {
+	resultMap, ok := result.(map[interface{}]interface{})
+	if !ok {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to parse ACL GETUSER response: unexpected type %T", result))
+		return
+	}
+
+	if len(resultMap) == 0 {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("ACL user %s not found", data.Name.ValueString()))
 		return
 	}
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read ACL user result, got error: %s", err))
-		return
+
+	var val []interface{}
+	for k, v := range resultMap {
+		val = append(val, k, v)
 	}
 
 	temp := &ACLUserResourceModel{}

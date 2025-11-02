@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -116,7 +117,7 @@ func (d *ACLUsersDataSource) Read(ctx context.Context, req datasource.ReadReques
 	for _, username := range usernames {
 		result, err := d.redisClient.client.Do(ctx, "ACL", "GETUSER", username).Result()
 		if err != nil {
-			if err != redis.Nil {
+			if !errors.Is(err, redis.Nil) {
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get ACL user %s, got error: %s", username, err))
 			}
 			continue

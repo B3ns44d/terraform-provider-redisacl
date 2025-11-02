@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -216,7 +217,7 @@ func UserExists(ctx context.Context, username string) (bool, error) {
 
 	_, err = client.Do(ctx, "ACL", "GETUSER", username).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return false, nil
 		}
 		return false, err

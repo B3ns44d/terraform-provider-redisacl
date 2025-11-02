@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -155,7 +156,7 @@ func (r *ACLUserResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	result, err := r.redisClient.client.Do(ctx, "ACL", "GETUSER", data.Name.ValueString()).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			resp.State.RemoveResource(ctx)
 			return
 		}

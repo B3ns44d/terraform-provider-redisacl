@@ -231,7 +231,7 @@ func testAccCheckACLUserExists(resourceName string) resource.TestCheckFunc {
 		ctx := context.Background()
 		exists, err := UserExists(ctx, rs.Primary.ID)
 		if err != nil {
-			return fmt.Errorf("Error checking if user exists: %v", err)
+			return fmt.Errorf("Error checking if user exists: %w", err)
 		}
 
 		if !exists {
@@ -252,7 +252,7 @@ func testAccCheckACLUserDestroy(s *terraform.State) error {
 
 		exists, err := UserExists(ctx, rs.Primary.ID)
 		if err != nil {
-			return fmt.Errorf("Error checking if user exists: %v", err)
+			return fmt.Errorf("Error checking if user exists: %w", err)
 		}
 
 		if exists {
@@ -268,7 +268,7 @@ func testAccCheckACLUserDoesNotExist(username string) resource.TestCheckFunc {
 		ctx := context.Background()
 		exists, err := UserExists(ctx, username)
 		if err != nil {
-			return fmt.Errorf("Error checking if user exists: %v", err)
+			return fmt.Errorf("Error checking if user exists: %w", err)
 		}
 
 		if exists {

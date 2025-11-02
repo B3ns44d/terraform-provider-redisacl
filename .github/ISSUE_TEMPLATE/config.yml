@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: General Discussion
+    url: https://github.com/B3ns44d/terraform-provider-redisacl/discussions
+    about: Ask questions, share ideas, or discuss the provider
+  - name: Documentation
+    url: https://registry.terraform.io/providers/B3ns44d/redisacl/latest/docs
+    about: Read the provider documentation on Terraform Registry
+  - name: Examples
+    url: https://github.com/B3ns44d/terraform-provider-redisacl/tree/main/examples
+    about: Check out usage examples and patterns
+  - name: Security Issue
+    url: https://github.com/B3ns44d/terraform-provider-redisacl/security/advisories/new
+    about: Report a security vulnerability (private)

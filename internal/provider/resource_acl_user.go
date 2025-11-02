@@ -30,6 +30,7 @@ type ACLUserResource struct {
 
 // ACLUserResourceModel describes the resource data model.
 type ACLUserResourceModel struct {
+	ID               types.String `tfsdk:"id"`
 	Name             types.String `tfsdk:"name"`
 	Enabled          types.Bool   `tfsdk:"enabled"`
 	Passwords        types.List   `tfsdk:"passwords"`
@@ -49,6 +50,13 @@ func (r *ACLUserResource) Schema(ctx context.Context, req resource.SchemaRequest
 		MarkdownDescription: "Manages a Redis ACL user.",
 
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				MarkdownDescription: "The ID of the user (same as name).",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the user.",
 				Required:            true,
@@ -126,6 +134,9 @@ func (r *ACLUserResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	// Set the ID to the user name
+	data.ID = data.Name
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -174,6 +185,9 @@ func (r *ACLUserResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	// Ensure ID is set
+	data.ID = data.Name
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -188,13 +202,16 @@ func (r *ACLUserResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	// Check for self-mutation
 	if !data.AllowSelfMutation.ValueBool() {
-		cmd := redis.NewStringCmd(ctx, "ACL", "WHOAMI")
-		err := r.redisClient.client.Do(ctx, cmd)
+		result, err := r.redisClient.client.Do(ctx, "ACL", "WHOAMI").Result()
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get current user, got error: %s", err))
 			return
 		}
-		currentUser := cmd.Val()
+		currentUser, ok := result.(string)
+		if !ok {
+			resp.Diagnostics.AddError("Client Error", "Unable to parse current user response")
+			return
+		}
 		if currentUser == data.Name.ValueString() {
 			resp.Diagnostics.AddError("Self-Mutation Error", "Cannot modify the currently authenticated user without setting allow_self_mutation to true")
 			return
@@ -208,6 +225,9 @@ func (r *ACLUserResource) Update(ctx context.Context, req resource.UpdateRequest
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update ACL user, got error: %s", err))
 		return
 	}
+
+	// Ensure ID is set
+	data.ID = data.Name
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -223,13 +243,16 @@ func (r *ACLUserResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	// Check for self-mutation
 	if !data.AllowSelfMutation.ValueBool() {
-		cmd := redis.NewStringCmd(ctx, "ACL", "WHOAMI")
-		err := r.redisClient.client.Do(ctx, cmd)
+		result, err := r.redisClient.client.Do(ctx, "ACL", "WHOAMI").Result()
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get current user, got error: %s", err))
 			return
 		}
-		currentUser := cmd.Val()
+		currentUser, ok := result.(string)
+		if !ok {
+			resp.Diagnostics.AddError("Client Error", "Unable to parse current user response")
+			return
+		}
 		if currentUser == data.Name.ValueString() {
 			resp.Diagnostics.AddError("Self-Mutation Error", "Cannot delete the currently authenticated user without setting allow_self_mutation to true")
 			return

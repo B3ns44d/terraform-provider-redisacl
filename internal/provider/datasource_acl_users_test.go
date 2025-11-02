@@ -14,9 +14,9 @@ import (
 
 func TestAccACLUsersDataSource_ReadAll(t *testing.T) {
 	testUsers := []string{"multi_user_1", "multi_user_2", "multi_user_3"}
-	
+
 	resource.Test(t, resource.TestCase{
-		PreCheck: func() { 
+		PreCheck: func() {
 			testAccPreCheck(t)
 			// Create multiple test users after cleanup
 			ctx := context.Background()
@@ -72,7 +72,7 @@ func TestAccACLUsersDataSource_WithResources(t *testing.T) {
 
 func TestAccACLUsersDataSource_Empty(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Clean up all test users to ensure clean slate
 	CleanupRedisUsers(ctx)
 
@@ -100,7 +100,7 @@ func TestAccACLUsersDataSource_Empty(t *testing.T) {
 
 func TestAccACLUsersDataSource_UserAttributes(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		PreCheck: func() { 
+		PreCheck: func() {
 			testAccPreCheck(t)
 			// Create a specific test user after cleanup
 			ctx := context.Background()

@@ -27,11 +27,11 @@ type ACLUserDataSource struct {
 
 // ACLUserDataSourceModel describes the data source data model.
 type ACLUserDataSourceModel struct {
-	Name     types.String `tfsdk:"name"`
-	Enabled  types.Bool   `tfsdk:"enabled"`
-	Keys     types.String `tfsdk:"keys"`
-	Channels types.String `tfsdk:"channels"`
-	Commands types.String `tfsdk:"commands"`
+	Name      types.String `tfsdk:"name"`
+	Enabled   types.Bool   `tfsdk:"enabled"`
+	Keys      types.String `tfsdk:"keys"`
+	Channels  types.String `tfsdk:"channels"`
+	Commands  types.String `tfsdk:"commands"`
 	Selectors types.List   `tfsdk:"selectors"`
 }
 

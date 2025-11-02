@@ -7,14 +7,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/redis/go-redis/v9"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/redis/go-redis/v9"
 )
+
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &ACLUserResource{}
 var _ resource.ResourceWithImportState = &ACLUserResource{}
@@ -30,15 +31,15 @@ type ACLUserResource struct {
 
 // ACLUserResourceModel describes the resource data model.
 type ACLUserResourceModel struct {
-	ID               types.String `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	Enabled          types.Bool   `tfsdk:"enabled"`
-	Passwords        types.List   `tfsdk:"passwords"`
-	Keys             types.String `tfsdk:"keys"`
-	Channels         types.String `tfsdk:"channels"`
-	Commands         types.String `tfsdk:"commands"`
-	Selectors        types.List   `tfsdk:"selectors"`
-	AllowSelfMutation types.Bool `tfsdk:"allow_self_mutation"`
+	ID                types.String `tfsdk:"id"`
+	Name              types.String `tfsdk:"name"`
+	Enabled           types.Bool   `tfsdk:"enabled"`
+	Passwords         types.List   `tfsdk:"passwords"`
+	Keys              types.String `tfsdk:"keys"`
+	Channels          types.String `tfsdk:"channels"`
+	Commands          types.String `tfsdk:"commands"`
+	Selectors         types.List   `tfsdk:"selectors"`
+	AllowSelfMutation types.Bool   `tfsdk:"allow_self_mutation"`
 }
 
 func (r *ACLUserResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {

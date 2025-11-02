@@ -16,7 +16,7 @@ import (
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
-	
+
 	// Start Redis container
 	if err := StartRedisContainer(ctx); err != nil {
 		fmt.Printf("Failed to start Redis container: %v\n", err)
@@ -69,9 +69,9 @@ func TestAccACLUserResource_Read(t *testing.T) {
 			},
 			// ImportState testing
 			{
-				ResourceName:      "redisacl_user.test",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            "redisacl_user.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"passwords", "allow_self_mutation"},
 			},
 		},
@@ -167,9 +167,9 @@ func TestAccACLUserResource_ImportState(t *testing.T) {
 			},
 			// Then test import
 			{
-				ResourceName:      "redisacl_user.import_test",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            "redisacl_user.import_test",
+				ImportState:             true,
+				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"passwords", "allow_self_mutation"},
 			},
 		},
@@ -244,7 +244,7 @@ func testAccCheckACLUserExists(resourceName string) resource.TestCheckFunc {
 
 func testAccCheckACLUserDestroy(s *terraform.State) error {
 	ctx := context.Background()
-	
+
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "redisacl_user" {
 			continue

@@ -210,13 +210,13 @@ func (p *RedisACLProvider) Configure(ctx context.Context, req provider.Configure
 			sentinelAddrs = append(sentinelAddrs, addr.ValueString())
 		}
 		opts := &redis.FailoverOptions{
-			MasterName:        sentinelModel.MasterName.ValueString(),
-			SentinelAddrs:     sentinelAddrs,
-			SentinelUsername:  sentinelModel.Username.ValueString(),
-			SentinelPassword:  sentinelModel.Password.ValueString(),
-			Username:          data.Username.ValueString(),
-			Password:          data.Password.ValueString(),
-			TLSConfig:         tlsConfig,
+			MasterName:       sentinelModel.MasterName.ValueString(),
+			SentinelAddrs:    sentinelAddrs,
+			SentinelUsername: sentinelModel.Username.ValueString(),
+			SentinelPassword: sentinelModel.Password.ValueString(),
+			Username:         data.Username.ValueString(),
+			Password:         data.Password.ValueString(),
+			TLSConfig:        tlsConfig,
 		}
 		client = redis.NewFailoverClient(opts)
 	} else if !data.Cluster.IsNull() {

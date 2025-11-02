@@ -23,22 +23,22 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 func testAccPreCheck(t *testing.T) {
 	// Verify testcontainers can run (Docker daemon available)
 	ctx := context.Background()
-	
+
 	// Check if Redis container is running
 	if redisHost == "" || redisPort == "" {
 		t.Fatal("Redis container not started. Ensure TestMain has been called to start the container.")
 	}
-	
+
 	// Verify Redis container is accessible
 	if err := WaitForRedisReady(ctx); err != nil {
 		t.Fatalf("Redis container not accessible: %v", err)
 	}
-	
+
 	// Verify REDIS_URL is set (should be set by StartRedisContainer)
 	if v := os.Getenv("REDIS_URL"); v == "" {
 		t.Fatal("REDIS_URL must be set for acceptance tests")
 	}
-	
+
 	// Clean up any existing test users before each test
 	if err := CleanupRedisUsers(ctx); err != nil {
 		t.Logf("Warning: failed to cleanup Redis users: %v", err)

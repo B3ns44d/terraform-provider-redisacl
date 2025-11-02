@@ -52,9 +52,9 @@ func TestAccACLUserDataSource_NotFound(t *testing.T) {
 
 func TestAccACLUserDataSource_WithSelectors(t *testing.T) {
 	t.Skip("Selectors may not be supported in Redis 7 Alpine or require different format")
-	
+
 	resource.Test(t, resource.TestCase{
-		PreCheck: func() { 
+		PreCheck: func() {
 			testAccPreCheck(t)
 			// Create user with selectors directly in Redis for testing
 			ctx := context.Background()

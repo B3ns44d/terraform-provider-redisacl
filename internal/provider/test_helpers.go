@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -192,7 +192,7 @@ func CreateTestUser(ctx context.Context, username, password string) error {
 	})
 	defer client.Close()
 
-	rules := []string{"reset", "on", ">"+password, "~*", "&*", "+@all"}
+	rules := []string{"reset", "on", ">" + password, "~*", "&*", "+@all"}
 	return client.ACLSetUser(ctx, username, rules...).Err()
 }
 
@@ -242,6 +242,6 @@ func CreateTestUserWithSelectors(ctx context.Context, username, password string)
 	})
 	defer client.Close()
 
-	rules := []string{"reset", "on", ">"+password, "~*", "&*", "+@all", "(~key* +get)", "(~data* +set)"}
+	rules := []string{"reset", "on", ">" + password, "~*", "&*", "+@all", "(~key* +get)", "(~data* +set)"}
 	return client.ACLSetUser(ctx, username, rules...).Err()
 }

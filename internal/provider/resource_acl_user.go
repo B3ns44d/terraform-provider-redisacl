@@ -12,8 +12,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/redis/go-redis/v9"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 )
-
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &ACLUserResource{}
 var _ resource.ResourceWithImportState = &ACLUserResource{}
@@ -51,6 +52,9 @@ func (r *ACLUserResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the user.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"enabled": schema.BoolAttribute{
 				MarkdownDescription: "Whether the user is enabled.",

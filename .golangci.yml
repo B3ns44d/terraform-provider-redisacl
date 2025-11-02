@@ -1,42 +1,197 @@
-version: "2"
+# golangci-lint configuration for Terraform Redis ACL Provider
+run:
+  timeout: 10m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - vendor
+    - .git
+  skip-files:
+    - ".*\\.pb\\.go$"
+    - ".*_generated\\.go$"
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  sort-results: true
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  
+  govet:
+    check-shadowing: true
+    enable-all: true
+    disable:
+      - fieldalignment  # Too noisy for this project
+  
+  gocyclo:
+    min-complexity: 15
+  
+  dupl:
+    threshold: 100
+  
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  
+  misspell:
+    locale: US
+  
+  lll:
+    line-length: 120
+  
+  goimports:
+    local-prefixes: github.com/B3ns44d/terraform-provider-redisacl
+  
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+  
+  funlen:
+    lines: 100
+    statements: 50
+  
+  gocognit:
+    min-complexity: 20
+  
+  nestif:
+    min-complexity: 4
+  
+  gomnd:
+    settings:
+      mnd:
+        checks: argument,case,condition,operation,return,assign
+        ignored-numbers: 0,1,2,3
+        ignored-functions: strings.SplitN
+  
+  godox:
+    keywords:
+      - NOTE
+      - OPTIMIZE
+      - HACK
+  
+  dogsled:
+    max-blank-identifiers: 2
+  
+  whitespace:
+    multi-if: false
+    multi-func: false
+
 linters:
-  default: none
+  disable-all: true
   enable:
-    - copyloopvar
-    - durationcheck
+    # Enabled by default
     - errcheck
-    - forcetypeassert
-    - godot
+    - gosimple
+    - govet
     - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    
+    # Additional linters
+    - asciicheck
+    - bodyclose
+    - dogsled
+    - dupl
+    - durationcheck
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - funlen
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godox
+    - gofmt
+    - gofumpt
+    - goimports
+    - gomnd
+    - goprintffuncname
+    - gosec
+    - lll
     - makezero
     - misspell
+    - nakedret
+    - nestif
     - nilerr
+    - nlreturn
+    - noctx
+    - nolintlint
+    - prealloc
     - predeclared
-    - staticcheck
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - thelper
+    - tparallel
     - unconvert
     - unparam
-    - unused
-    - usetesting
-  exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+    - wastedassign
+    - whitespace
+    - wsl
+
 issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gomnd
+        - funlen
+        - gocognit
+        - gocyclo
+        - dupl
+        - lll
+    
+    # Exclude some staticcheck messages
+    - linters:
+        - staticcheck
+      text: "SA9003:"
+    
+    # Exclude lll issues for long lines with go:generate
+    - linters:
+        - lll
+      source: "^//go:generate "
+    
+    # Exclude godox for TODO comments in development
+    - linters:
+        - godox
+      text: "TODO"
+      path: _test\.go
+    
+    # Allow long functions in main.go
+    - path: main\.go
+      linters:
+        - funlen
+    
+    # Allow complex functions in helpers
+    - path: helpers\.go
+      linters:
+        - gocognit
+        - gocyclo
+        - funlen
+
+  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
-formatters:
-  enable:
-    - gofmt
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+  new: false
+
+severity:
+  default-severity: error
+  case-sensitive: false

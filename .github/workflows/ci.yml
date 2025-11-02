@@ -2,26 +2,294 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [ master ]
   pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same workflow and branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.21'
+  GOLANGCI_LINT_VERSION: 'v1.55'
 
 jobs:
-  test:
+  # Job 1: Code Quality and Linting
+  lint:
+    name: Lint and Format Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.23'
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-      - name: Start Redis
-        run: docker run -d --name redis-test -p 6379:6379 bitnami/redis:6.2
+      - name: Download dependencies
+        run: go mod download
 
-      - name: Run tests
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Check formatting
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "The following files are not formatted:"
+            gofmt -s -l .
+            echo "Please run 'make fmt' to format your code."
+            exit 1
+          fi
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: --timeout=10m --verbose
+
+      - name: Check for vulnerabilities
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  # Job 2: Build and Test
+  build-and-test:
+    name: Build and Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        go-version: ['1.21', '1.22']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build provider
+        run: make build
+
+      - name: Run unit tests
+        run: make test
+
+      - name: Upload coverage reports
+        if: matrix.go-version == '1.21'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+
+  # Job 3: Acceptance Tests with Redis
+  acceptance-tests:
+    name: Acceptance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [lint, build-and-test]
+    strategy:
+      fail-fast: false
+      matrix:
+        terraform-version: ['1.0.*', '1.1.*', '1.2.*', '1.3.*', '1.4.*', '1.5.*', '1.6.*']
+        redis-version: ['6.2', '7.0', '7.2']
+    services:
+      redis:
+        image: redis:${{ matrix.redis-version }}-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ matrix.terraform-version }}
+          terraform_wrapper: false
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Wait for Redis to be ready
+        run: |
+          timeout 30s bash -c 'until redis-cli -h localhost -p 6379 ping; do sleep 1; done'
+
+      - name: Run acceptance tests
         env:
+          TF_ACC: "1"
           REDIS_URL: "redis://localhost:6379"
         run: make testacc
+
+  # Job 4: Documentation Generation and Validation
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Generate documentation
+        run: make generate
+
+      - name: Check for documentation changes
+        run: |
+          git diff --compact-summary --exit-code || \
+            (echo; echo "Unexpected difference in directories after code generation. Run 'make generate' command and commit."; exit 1)
+
+      - name: Validate examples
+        run: |
+          for example in examples/*/; do
+            if [ -f "$example/main.tf" ]; then
+              echo "Validating $example"
+              cd "$example"
+              terraform init -backend=false
+              terraform validate
+              cd - > /dev/null
+            fi
+          done
+
+  # Job 5: Security Scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Job 6: Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [acceptance-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run integration tests with different Redis configurations
+        run: |
+          # Test with Redis Cluster
+          docker run -d --name redis-cluster --net=host grokzen/redis-cluster:7.0.0
+          sleep 30
+          
+          # Test with Redis Sentinel
+          docker run -d --name redis-sentinel --net=host bitnami/redis-sentinel:7.0
+          sleep 30
+          
+          # Run tests
+          TF_ACC=1 go test -v -timeout=15m ./internal/provider/ -run="TestAcc.*Cluster|TestAcc.*Sentinel" || true
+          
+          # Cleanup
+          docker stop redis-cluster redis-sentinel || true
+          docker rm redis-cluster redis-sentinel || true
+
+  # Job 7: Build Matrix for Multiple Platforms
+  build-matrix:
+    name: Build Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint]
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          make build
+          ls -la terraform-provider-redisacl*
+
+  # Job 8: Final Status Check
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [lint, build-and-test, acceptance-tests, docs, security, build-matrix]
+    if: always()
+    steps:
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" || \
+                "${{ needs.build-and-test.result }}" != "success" || \
+                "${{ needs.acceptance-tests.result }}" != "success" || \
+                "${{ needs.docs.result }}" != "success" || \
+                "${{ needs.security.result }}" != "success" || \
+                "${{ needs.build-matrix.result }}" != "success" ]]; then
+            echo "One or more CI jobs failed"
+            exit 1
+          fi
+          echo "All CI jobs passed successfully!"

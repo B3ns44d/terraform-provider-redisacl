@@ -14,44 +14,44 @@ terraform {
 variable "redis_tls_config" {
   description = "TLS configuration for Redis connections"
   type = object({
-    address                   = string
-    password                  = string
-    ca_cert_path             = string
-    client_cert_path         = string
-    client_key_path          = string
-    insecure_skip_verify     = bool
+    address              = string
+    password             = string
+    ca_cert_path         = string
+    client_cert_path     = string
+    client_key_path      = string
+    insecure_skip_verify = bool
   })
   default = {
-    address                   = "secure-redis.example.com:6380"
-    password                  = "secure-redis-password"
-    ca_cert_path             = "certs/ca.pem"
-    client_cert_path         = "certs/client.crt"
-    client_key_path          = "certs/client.key"
-    insecure_skip_verify     = false
+    address              = "secure-redis.example.com:6380"
+    password             = "secure-redis-password"
+    ca_cert_path         = "certs/ca.pem"
+    client_cert_path     = "certs/client.crt"
+    client_key_path      = "certs/client.key"
+    insecure_skip_verify = false
   }
 }
 
 # Provider with basic TLS (server authentication only)
 provider "redisacl" {
-  alias   = "tls_basic"
-  address = var.redis_tls_config.address
+  alias    = "tls_basic"
+  address  = var.redis_tls_config.address
   password = var.redis_tls_config.password
-  use_tls = true
-  
+  use_tls  = true
+
   # For testing with self-signed certificates (NOT for production)
   tls_insecure_skip_verify = var.redis_tls_config.insecure_skip_verify
 }
 
 # Provider with mutual TLS (client and server authentication)
 provider "redisacl" {
-  alias   = "mtls"
-  address = var.redis_tls_config.address
+  alias    = "mtls"
+  address  = var.redis_tls_config.address
   password = var.redis_tls_config.password
-  use_tls = true
-  
+  use_tls  = true
+
   # CA certificate to verify server
   tls_ca_cert = file(var.redis_tls_config.ca_cert_path)
-  
+
   # Client certificate and key for mutual authentication
   tls_cert = file(var.redis_tls_config.client_cert_path)
   tls_key  = file(var.redis_tls_config.client_key_path)
@@ -63,7 +63,7 @@ provider "redisacl" {
   username = "default"
   password = "master-password"
   use_tls  = true
-  
+
   sentinel {
     master_name = "mymaster"
     addresses = [
@@ -74,7 +74,7 @@ provider "redisacl" {
     username = "sentinel-user"
     password = "sentinel-password"
   }
-  
+
   tls_ca_cert = file(var.redis_tls_config.ca_cert_path)
 }
 
@@ -84,7 +84,7 @@ provider "redisacl" {
   username = "cluster-user"
   password = "cluster-password"
   use_tls  = true
-  
+
   cluster {
     addresses = [
       "cluster-node1.example.com:6380",
@@ -92,7 +92,7 @@ provider "redisacl" {
       "cluster-node3.example.com:6380"
     ]
   }
-  
+
   tls_ca_cert = file(var.redis_tls_config.ca_cert_path)
   tls_cert    = file(var.redis_tls_config.client_cert_path)
   tls_key     = file(var.redis_tls_config.client_key_path)
@@ -101,11 +101,11 @@ provider "redisacl" {
 # Application user with basic TLS
 resource "redisacl_user" "app_user_tls" {
   provider = redisacl.tls_basic
-  
+
   name      = "app-tls-user"
   enabled   = true
   passwords = ["secure-app-password"]
-  
+
   keys     = "~app:* ~cache:*"
   channels = "&app:*"
   commands = "+@read +@write -@dangerous"
@@ -114,11 +114,11 @@ resource "redisacl_user" "app_user_tls" {
 # High-security user with mutual TLS
 resource "redisacl_user" "secure_user_mtls" {
   provider = redisacl.mtls
-  
+
   name      = "secure-mtls-user"
   enabled   = true
   passwords = ["very-secure-password"]
-  
+
   keys     = "~secure:* ~encrypted:*"
   channels = "&secure:*"
   commands = "+@read +@write +@stream -@dangerous -@admin"
@@ -127,27 +127,27 @@ resource "redisacl_user" "secure_user_mtls" {
 # Admin user for Sentinel setup
 resource "redisacl_user" "sentinel_admin" {
   provider = redisacl.sentinel_tls
-  
+
   name      = "sentinel-admin"
   enabled   = true
   passwords = ["sentinel-admin-password"]
-  
+
   keys     = "~*"
   channels = "&*"
   commands = "+@all"
-  
+
   allow_self_mutation = true
 }
 
 # Cluster application user
 resource "redisacl_user" "cluster_app_user" {
   provider = redisacl.cluster_tls
-  
+
   name      = "cluster-app-user"
   enabled   = true
   passwords = ["cluster-app-password"]
-  
-  keys     = "~{app}:* ~{cache}:*"  # Hash tags for cluster
+
+  keys     = "~{app}:* ~{cache}:*" # Hash tags for cluster
   channels = "&app:*"
   commands = "+@read +@write +@stream -@dangerous"
 }
@@ -155,11 +155,11 @@ resource "redisacl_user" "cluster_app_user" {
 # Monitoring user with TLS (minimal permissions)
 resource "redisacl_user" "monitoring_tls" {
   provider = redisacl.tls_basic
-  
+
   name      = "monitoring-tls"
   enabled   = true
   passwords = ["monitoring-password"]
-  
+
   keys     = "~"
   channels = "&"
   commands = "+ping +info +client +memory +latency"

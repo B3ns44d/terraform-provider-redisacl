@@ -14,9 +14,9 @@ terraform {
 variable "environments" {
   description = "Environment configurations"
   type = map(object({
-    redis_address = string
+    redis_address  = string
     redis_password = string
-    use_tls = bool
+    use_tls        = bool
   }))
   default = {
     dev = {
@@ -39,8 +39,8 @@ variable "environments" {
 
 variable "app_passwords" {
   description = "Application passwords for each environment"
-  type = map(string)
-  sensitive = true
+  type        = map(string)
+  sensitive   = true
   default = {
     dev     = "dev-app-password"
     staging = "staging-app-password"
@@ -78,14 +78,14 @@ locals {
     channels = "&*"
     commands = "+@all -@dangerous"
   }
-  
+
   # Staging: More restrictive, similar to production
   staging_permissions = {
     keys     = "~app:* ~cache:* ~session:*"
     channels = "&app:* &notifications:*"
     commands = "+@read +@write +@stream -@dangerous -@admin"
   }
-  
+
   # Production: Most restrictive settings
   prod_permissions = {
     keys     = "~app:* ~cache:*"
@@ -97,11 +97,11 @@ locals {
 # Application users for each environment
 resource "redisacl_user" "app_user_dev" {
   provider = redisacl.dev
-  
+
   name      = "app-user"
   enabled   = true
   passwords = [var.app_passwords.dev]
-  
+
   keys     = local.dev_permissions.keys
   channels = local.dev_permissions.channels
   commands = local.dev_permissions.commands
@@ -109,11 +109,11 @@ resource "redisacl_user" "app_user_dev" {
 
 resource "redisacl_user" "app_user_staging" {
   provider = redisacl.staging
-  
+
   name      = "app-user"
   enabled   = true
   passwords = [var.app_passwords.staging]
-  
+
   keys     = local.staging_permissions.keys
   channels = local.staging_permissions.channels
   commands = local.staging_permissions.commands
@@ -121,11 +121,11 @@ resource "redisacl_user" "app_user_staging" {
 
 resource "redisacl_user" "app_user_prod" {
   provider = redisacl.prod
-  
+
   name      = "app-user"
   enabled   = true
   passwords = [var.app_passwords.prod]
-  
+
   keys     = local.prod_permissions.keys
   channels = local.prod_permissions.channels
   commands = local.prod_permissions.commands
@@ -134,11 +134,11 @@ resource "redisacl_user" "app_user_prod" {
 # Background job users (only in staging and production)
 resource "redisacl_user" "job_user_staging" {
   provider = redisacl.staging
-  
+
   name      = "job-processor"
   enabled   = true
   passwords = ["staging-job-password"]
-  
+
   keys     = "~jobs:* ~temp:*"
   channels = "&job:*"
   commands = "+@read +@write +@list +@stream -@dangerous"
@@ -146,11 +146,11 @@ resource "redisacl_user" "job_user_staging" {
 
 resource "redisacl_user" "job_user_prod" {
   provider = redisacl.prod
-  
+
   name      = "job-processor"
   enabled   = true
   passwords = ["prod-job-password"]
-  
+
   keys     = "~jobs:*"
   channels = "&job:notifications:*"
   commands = "+@read +@write +@list +@stream -@dangerous -@admin"
@@ -159,23 +159,23 @@ resource "redisacl_user" "job_user_prod" {
 # Monitoring users for all environments
 resource "redisacl_user" "monitoring_dev" {
   provider = redisacl.dev
-  
+
   name      = "monitoring"
   enabled   = true
   passwords = ["dev-monitoring-password"]
-  
-  keys     = "~"  # No key access
-  channels = "&"  # No channel access
+
+  keys     = "~" # No key access
+  channels = "&" # No channel access
   commands = "+ping +info +client +config|get +memory +latency +slowlog +dbsize"
 }
 
 resource "redisacl_user" "monitoring_staging" {
   provider = redisacl.staging
-  
+
   name      = "monitoring"
   enabled   = true
   passwords = ["staging-monitoring-password"]
-  
+
   keys     = "~"
   channels = "&"
   commands = "+ping +info +client +memory +latency +slowlog +dbsize"
@@ -183,11 +183,11 @@ resource "redisacl_user" "monitoring_staging" {
 
 resource "redisacl_user" "monitoring_prod" {
   provider = redisacl.prod
-  
+
   name      = "monitoring"
   enabled   = true
   passwords = ["prod-monitoring-password"]
-  
+
   keys     = "~"
   channels = "&"
   commands = "+ping +info +client +memory +latency +slowlog"

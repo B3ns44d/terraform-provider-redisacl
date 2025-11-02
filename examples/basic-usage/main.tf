@@ -13,7 +13,7 @@ terraform {
 # Configure the provider for local Redis
 provider "redisacl" {
   address  = "localhost:6379"
-  password = "your-redis-password"  # Change this to your Redis password
+  password = "your-redis-password" # Change this to your Redis password
 }
 
 # Create a read-only user for applications
@@ -21,13 +21,13 @@ resource "redisacl_user" "readonly_app" {
   name      = "readonly-app"
   enabled   = true
   passwords = ["app-readonly-password"]
-  
+
   # Allow access to application keys only
   keys = "~app:* ~cache:*"
-  
+
   # Allow all pub/sub channels
   channels = "&*"
-  
+
   # Only allow read operations
   commands = "+@read -@write -@dangerous"
 }
@@ -37,13 +37,13 @@ resource "redisacl_user" "write_app" {
   name      = "write-app"
   enabled   = true
   passwords = ["app-write-password"]
-  
+
   # Allow access to specific key patterns
   keys = "~data:* ~temp:*"
-  
+
   # Allow specific pub/sub channels
   channels = "&notifications:* &events:*"
-  
+
   # Allow read and write, but not dangerous operations
   commands = "+@read +@write -@dangerous"
 }
@@ -53,12 +53,12 @@ resource "redisacl_user" "admin" {
   name      = "admin-user"
   enabled   = true
   passwords = ["secure-admin-password"]
-  
+
   # Full access to all keys and channels
   keys     = "~*"
   channels = "&*"
   commands = "+@all"
-  
+
   # Allow self-modification (needed for admin operations)
   allow_self_mutation = true
 }
@@ -68,13 +68,13 @@ resource "redisacl_user" "monitoring" {
   name      = "monitoring-user"
   enabled   = true
   passwords = ["monitoring-password"]
-  
+
   # No key access needed for monitoring
   keys = "~"
-  
+
   # No pub/sub access needed
   channels = "&"
-  
+
   # Only allow monitoring and info commands
   commands = "+ping +info +client +config|get +memory +latency +slowlog"
 }

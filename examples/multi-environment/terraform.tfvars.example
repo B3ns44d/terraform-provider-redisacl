@@ -1,0 +1,26 @@
+# Example terraform.tfvars file
+# Copy this to terraform.tfvars and update with your actual values
+
+environments = {
+  dev = {
+    redis_address  = "localhost:6379"
+    redis_password = "your-dev-redis-password"
+    use_tls        = false
+  }
+  staging = {
+    redis_address  = "staging-redis.your-domain.com:6379"
+    redis_password = "your-staging-redis-password"
+    use_tls        = true
+  }
+  prod = {
+    redis_address  = "prod-redis.your-domain.com:6380"
+    redis_password = "your-prod-redis-password"
+    use_tls        = true
+  }
+}
+
+app_passwords = {
+  dev     = "dev-app-secure-password"
+  staging = "staging-app-secure-password"
+  prod    = "prod-app-very-secure-password"
+}

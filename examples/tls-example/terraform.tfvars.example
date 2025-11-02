@@ -1,0 +1,40 @@
+# TLS Configuration Example
+# Copy this to terraform.tfvars and update with your values
+
+redis_tls_config = {
+  # Redis server address with TLS port
+  address = "localhost:6380"  # Change to your Redis TLS endpoint
+  
+  # Redis authentication password
+  password = "your-secure-redis-password"
+  
+  # Certificate file paths (relative to this directory)
+  ca_cert_path     = "certs/ca.pem"      # CA certificate for server verification
+  client_cert_path = "certs/client.crt"  # Client certificate for mutual TLS
+  client_key_path  = "certs/client.key"  # Client private key for mutual TLS
+  
+  # Security settings
+  insecure_skip_verify = false  # Set to true only for testing with self-signed certs
+}
+
+# Alternative configurations for different environments:
+
+# Production with valid certificates
+# redis_tls_config = {
+#   address                   = "prod-redis.your-domain.com:6380"
+#   password                  = "production-password"
+#   ca_cert_path             = "/etc/ssl/certs/redis-ca.pem"
+#   client_cert_path         = "/etc/ssl/certs/redis-client.crt"
+#   client_key_path          = "/etc/ssl/private/redis-client.key"
+#   insecure_skip_verify     = false
+# }
+
+# Testing with self-signed certificates
+# redis_tls_config = {
+#   address                   = "localhost:6380"
+#   password                  = "test-password"
+#   ca_cert_path             = "certs/ca.pem"
+#   client_cert_path         = "certs/client.crt"
+#   client_key_path          = "certs/client.key"
+#   insecure_skip_verify     = true  # Only for testing!
+# }

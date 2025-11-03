@@ -14,7 +14,6 @@ concurrency:
 
 env:
   GO_VERSION: '1.24'
-  GOLANGCI_LINT_VERSION: 'latest'
 
 jobs:
   # Job 1: Code Quality and Linting
@@ -54,9 +53,9 @@ jobs:
           fi
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          version: latest
           args: --timeout=10m --verbose
 
       - name: Check for vulnerabilities
@@ -71,13 +70,13 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        go-version: ['1.22', '1.24']
+        go-version: ['1.23', '1.24']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
@@ -92,7 +91,7 @@ jobs:
         run: make test
 
       - name: Upload coverage reports
-        if: matrix.go-version == '1.21'
+        if: matrix.go-version == '1.24'
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.out

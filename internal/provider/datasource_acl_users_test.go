@@ -74,7 +74,7 @@ func TestAccACLUsersDataSource_Empty(t *testing.T) {
 	ctx := context.Background()
 
 	// Clean up all test users to ensure clean slate
-	CleanupRedisUsers(ctx)
+	_ = CleanupRedisUsers(ctx)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

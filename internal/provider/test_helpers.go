@@ -66,13 +66,13 @@ func StartRedisContainer(ctx context.Context) error {
 
 	// Wait for Redis to be ready
 	if err := WaitForRedisReady(ctx); err != nil {
-		return fmt.Errorf("Redis container not ready: %w", err)
+		return fmt.Errorf("redis container not ready: %w", err)
 	}
 
 	// Set environment variables for tests
-	os.Setenv("REDIS_HOST", redisHost)
-	os.Setenv("REDIS_PORT", redisPort)
-	os.Setenv("REDIS_URL", GetRedisConnectionString())
+	_ = os.Setenv("REDIS_HOST", redisHost)
+	_ = os.Setenv("REDIS_PORT", redisPort)
+	_ = os.Setenv("REDIS_URL", GetRedisConnectionString())
 
 	log.Printf("Redis container started at %s:%s", redisHost, redisPort)
 	return nil
@@ -90,9 +90,9 @@ func StopRedisContainer(ctx context.Context) error {
 	redisPort = ""
 
 	// Clean up environment variables
-	os.Unsetenv("REDIS_HOST")
-	os.Unsetenv("REDIS_PORT")
-	os.Unsetenv("REDIS_URL")
+	_ = os.Unsetenv("REDIS_HOST")
+	_ = os.Unsetenv("REDIS_PORT")
+	_ = os.Unsetenv("REDIS_URL")
 
 	return err
 }
@@ -108,7 +108,7 @@ func GetRedisConnectionString() string {
 // WaitForRedisReady waits for Redis to be ready to accept connections
 func WaitForRedisReady(ctx context.Context) error {
 	if redisHost == "" || redisPort == "" {
-		return fmt.Errorf("Redis container not started")
+		return fmt.Errorf("redis container not started")
 	}
 
 	port, err := strconv.Atoi(redisPort)
@@ -121,7 +121,7 @@ func WaitForRedisReady(ctx context.Context) error {
 		Password: "testpass",
 		DB:       0,
 	})
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Try to ping Redis with timeout
 	timeout := 30 * time.Second
@@ -135,7 +135,7 @@ func WaitForRedisReady(ctx context.Context) error {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	return fmt.Errorf("Redis not ready after %v", timeout)
+	return fmt.Errorf("redis not ready after %v", timeout)
 }
 
 // CleanupRedisUsers removes all test users from Redis
@@ -154,7 +154,7 @@ func CleanupRedisUsers(ctx context.Context) error {
 		Password: "testpass",
 		DB:       0,
 	})
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Get all users
 	users, err := client.Do(ctx, "ACL", "USERS").StringSlice()
@@ -178,7 +178,7 @@ func CleanupRedisUsers(ctx context.Context) error {
 // CreateTestUser creates a test user in Redis for testing
 func CreateTestUser(ctx context.Context, username, password string) error {
 	if redisHost == "" || redisPort == "" {
-		return fmt.Errorf("Redis container not started")
+		return fmt.Errorf("redis container not started")
 	}
 
 	port, err := strconv.Atoi(redisPort)
@@ -191,7 +191,7 @@ func CreateTestUser(ctx context.Context, username, password string) error {
 		Password: "testpass",
 		DB:       0,
 	})
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	rules := []string{"reset", "on", ">" + password, "~*", "&*", "+@all"}
 	return client.ACLSetUser(ctx, username, rules...).Err()
@@ -200,7 +200,7 @@ func CreateTestUser(ctx context.Context, username, password string) error {
 // UserExists checks if a user exists in Redis
 func UserExists(ctx context.Context, username string) (bool, error) {
 	if redisHost == "" || redisPort == "" {
-		return false, fmt.Errorf("Redis container not started")
+		return false, fmt.Errorf("redis container not started")
 	}
 
 	port, err := strconv.Atoi(redisPort)
@@ -213,7 +213,7 @@ func UserExists(ctx context.Context, username string) (bool, error) {
 		Password: "testpass",
 		DB:       0,
 	})
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	_, err = client.Do(ctx, "ACL", "GETUSER", username).Result()
 	if err != nil {
@@ -228,7 +228,7 @@ func UserExists(ctx context.Context, username string) (bool, error) {
 // CreateTestUserWithSelectors creates a test user with selectors in Redis for testing
 func CreateTestUserWithSelectors(ctx context.Context, username, password string) error {
 	if redisHost == "" || redisPort == "" {
-		return fmt.Errorf("Redis container not started")
+		return fmt.Errorf("redis container not started")
 	}
 
 	port, err := strconv.Atoi(redisPort)
@@ -241,7 +241,7 @@ func CreateTestUserWithSelectors(ctx context.Context, username, password string)
 		Password: "testpass",
 		DB:       0,
 	})
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	rules := []string{"reset", "on", ">" + password, "~*", "&*", "+@all", "(~key* +get)", "(~data* +set)"}
 	return client.ACLSetUser(ctx, username, rules...).Err()

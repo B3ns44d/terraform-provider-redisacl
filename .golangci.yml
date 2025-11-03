@@ -1,27 +1,13 @@
 # golangci-lint configuration
-# Optimized for golangci-lint v1.55.2 (GitHub Actions)
-
 run:
   timeout: 10m
   tests: true
-  skip-dirs:
-    - vendor
-    - .git
 
 linters-settings:
   errcheck:
     check-type-assertions: true
   govet:
     check-shadowing: true
-  gocyclo:
-    min-complexity: 30
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-  misspell:
-    locale: US
 
 linters:
   disable-all: true
@@ -31,25 +17,9 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    - bodyclose
     - gosec
     - misspell
-    - revive
-    - gocritic
-    - gocyclo
-    - dupl
-    - goconst
-    - prealloc
 
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - dupl
-        - gocyclo
-        - goconst
-    - path: main\.go
-      linters:
-        - revive

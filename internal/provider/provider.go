@@ -164,7 +164,9 @@ func (p *RedisACLProvider) Configure(ctx context.Context, req provider.Configure
 	}
 	var tlsConfig *tls.Config
 	if data.UseTLS.ValueBool() {
-		tlsConfig = &tls.Config{}
+		tlsConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12, // Set minimum TLS version for security
+		}
 		if data.TLSInsecureSkipVerify.ValueBool() {
 			tlsConfig.InsecureSkipVerify = true
 		}

@@ -1,20 +1,16 @@
-# golangci-lint configuration
-version: "2"
-
 run:
-  timeout: 10m
+  timeout: 5m
   tests: true
+  issues-exit-code: 1
 
 linters:
   enable:
-    - errcheck
     - govet
-    - ineffassign
     - staticcheck
-    - unused
-    - gosec
+    - errcheck
+    - revive
+    - gofmt
+    - goimports
+    - ineffassign
     - misspell
-
-issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
+    - unused

@@ -64,12 +64,12 @@ type ClusterModel struct {
 	Password  types.String   `tfsdk:"password"`
 }
 
-func (p *RedisACLProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+func (p *RedisACLProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "redisacl"
 	resp.Version = p.version
 }
 
-func (p *RedisACLProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *RedisACLProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"address": schema.StringAttribute{
@@ -267,13 +267,13 @@ func (p *RedisACLProvider) Configure(ctx context.Context, req provider.Configure
 	resp.ResourceData = redisClient
 }
 
-func (p *RedisACLProvider) Resources(ctx context.Context) []func() resource.Resource {
+func (p *RedisACLProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewACLUserResource,
 	}
 }
 
-func (p *RedisACLProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+func (p *RedisACLProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewACLUserDataSource,
 		NewACLUsersDataSource,

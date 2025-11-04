@@ -18,7 +18,7 @@ func TestAccACLUserDataSource_Read(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUserDataSourceConfig_read("datasource_test_user"),
+				Config: testAccACLUserDataSourceConfigRead("datasource_test_user"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.redisacl_user.test", "name", "datasource_test_user"),
 					resource.TestCheckResourceAttr("data.redisacl_user.test", "enabled", "true"),
@@ -43,7 +43,7 @@ func TestAccACLUserDataSource_NotFound(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      testAccACLUserDataSourceConfig_notFound("nonexistent_user"),
+				Config:      testAccACLUserDataSourceConfigNotFound("nonexistent_user"),
 				ExpectError: regexp.MustCompile("ACL user nonexistent_user not found"),
 			},
 		},
@@ -66,7 +66,7 @@ func TestAccACLUserDataSource_WithSelectors(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUserDataSourceConfig_withSelectors("selector_test_user"),
+				Config: testAccACLUserDataSourceConfigWithSelectors("selector_test_user"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.redisacl_user.test", "name", "selector_test_user"),
 					resource.TestCheckResourceAttr("data.redisacl_user.test", "enabled", "true"),
@@ -79,7 +79,7 @@ func TestAccACLUserDataSource_WithSelectors(t *testing.T) {
 
 // Config helper functions
 
-func testAccACLUserDataSourceConfig_read(name string) string {
+func testAccACLUserDataSourceConfigRead(name string) string {
 	return fmt.Sprintf(`
 provider "redisacl" {}
 
@@ -97,7 +97,7 @@ data "redisacl_user" "test" {
 `, name)
 }
 
-func testAccACLUserDataSourceConfig_notFound(name string) string {
+func testAccACLUserDataSourceConfigNotFound(name string) string {
 	return fmt.Sprintf(`
 provider "redisacl" {}
 
@@ -107,7 +107,7 @@ data "redisacl_user" "test" {
 `, name)
 }
 
-func testAccACLUserDataSourceConfig_withSelectors(name string) string {
+func testAccACLUserDataSourceConfigWithSelectors(name string) string {
 	return fmt.Sprintf(`
 provider "redisacl" {}
 

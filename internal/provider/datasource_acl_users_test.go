@@ -30,7 +30,7 @@ func TestAccACLUsersDataSource_ReadAll(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUsersDataSourceConfig_readAll(),
+				Config: testAccACLUsersDataSourceConfigReadAll(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Check that we have at least the test users we created (plus default user)
 					resource.TestCheckResourceAttrWith("data.redisacl_users.test", "users.#", func(value string) error {
@@ -53,7 +53,7 @@ func TestAccACLUsersDataSource_WithResources(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUsersDataSourceConfig_withResources(),
+				Config: testAccACLUsersDataSourceConfigWithResources(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Check that we have at least the users we created via resources
 					resource.TestCheckResourceAttrWith("data.redisacl_users.test", "users.#", func(value string) error {
@@ -81,7 +81,7 @@ func TestAccACLUsersDataSource_Empty(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUsersDataSourceConfig_empty(),
+				Config: testAccACLUsersDataSourceConfigEmpty(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Should have at least the default user
 					resource.TestCheckResourceAttrWith("data.redisacl_users.test", "users.#", func(value string) error {
@@ -112,7 +112,7 @@ func TestAccACLUsersDataSource_UserAttributes(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUsersDataSourceConfig_userAttributes(),
+				Config: testAccACLUsersDataSourceConfigUserAttributes(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrWith("data.redisacl_users.test", "users.#", func(value string) error {
 						if value == "0" {
@@ -182,7 +182,7 @@ func testAccCheckUserAttributesPopulated(resourceName string) resource.TestCheck
 
 // Config helper functions
 
-func testAccACLUsersDataSourceConfig_readAll() string {
+func testAccACLUsersDataSourceConfigReadAll() string {
 	return `
 provider "redisacl" {}
 
@@ -190,7 +190,7 @@ data "redisacl_users" "test" {}
 `
 }
 
-func testAccACLUsersDataSourceConfig_withResources() string {
+func testAccACLUsersDataSourceConfigWithResources() string {
 	return `
 provider "redisacl" {}
 
@@ -216,7 +216,7 @@ data "redisacl_users" "test" {
 `
 }
 
-func testAccACLUsersDataSourceConfig_empty() string {
+func testAccACLUsersDataSourceConfigEmpty() string {
 	return `
 provider "redisacl" {}
 
@@ -224,7 +224,7 @@ data "redisacl_users" "test" {}
 `
 }
 
-func testAccACLUsersDataSourceConfig_userAttributes() string {
+func testAccACLUsersDataSourceConfigUserAttributes() string {
 	return `
 provider "redisacl" {}
 

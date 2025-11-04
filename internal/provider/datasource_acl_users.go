@@ -31,11 +31,11 @@ type ACLUsersDataSourceModel struct {
 	Users []ACLUserDataSourceModel `tfsdk:"users"`
 }
 
-func (d *ACLUsersDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+func (d *ACLUsersDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_users"
 }
 
-func (d *ACLUsersDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *ACLUsersDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Gets information about all Redis ACL users.",
 
@@ -76,7 +76,7 @@ func (d *ACLUsersDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 	}
 }
 
-func (d *ACLUsersDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *ACLUsersDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
 		return

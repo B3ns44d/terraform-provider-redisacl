@@ -41,7 +41,7 @@ func TestAccACLUserResource_Create(t *testing.T) {
 		CheckDestroy:             testAccCheckACLUserDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUserResourceConfig_basic("testuser1"),
+				Config: testAccACLUserResourceConfigBasic("testuser1"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckACLUserExists("redisacl_user.test"),
 					resource.TestCheckResourceAttr("redisacl_user.test", "name", "testuser1"),
@@ -60,7 +60,7 @@ func TestAccACLUserResource_Read(t *testing.T) {
 		CheckDestroy:             testAccCheckACLUserDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUserResourceConfig_basic("testuser2"),
+				Config: testAccACLUserResourceConfigBasic("testuser2"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckACLUserExists("redisacl_user.test"),
 					resource.TestCheckResourceAttr("redisacl_user.test", "name", "testuser2"),
@@ -85,7 +85,7 @@ func TestAccACLUserResource_Update(t *testing.T) {
 		CheckDestroy:             testAccCheckACLUserDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUserResourceConfig_withPermissions("testuser3", "~key1", "&channel1", "+get"),
+				Config: testAccACLUserResourceConfigWithPermissions("testuser3", "~key1", "&channel1", "+get"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckACLUserExists("redisacl_user.test"),
 					resource.TestCheckResourceAttr("redisacl_user.test", "name", "testuser3"),
@@ -95,7 +95,7 @@ func TestAccACLUserResource_Update(t *testing.T) {
 				),
 			},
 			{
-				Config: testAccACLUserResourceConfig_withPermissions("testuser3", "~key2", "&channel2", "+set"),
+				Config: testAccACLUserResourceConfigWithPermissions("testuser3", "~key2", "&channel2", "+set"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckACLUserExists("redisacl_user.test"),
 					resource.TestCheckResourceAttr("redisacl_user.test", "name", "testuser3"),
@@ -115,14 +115,14 @@ func TestAccACLUserResource_ForceReplaceOnNameChange(t *testing.T) {
 		CheckDestroy:             testAccCheckACLUserDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUserResourceConfig_basic("testuser4"),
+				Config: testAccACLUserResourceConfigBasic("testuser4"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckACLUserExists("redisacl_user.test"),
 					resource.TestCheckResourceAttr("redisacl_user.test", "name", "testuser4"),
 				),
 			},
 			{
-				Config: testAccACLUserResourceConfig_basic("testuser4_renamed"),
+				Config: testAccACLUserResourceConfigBasic("testuser4_renamed"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckACLUserExists("redisacl_user.test"),
 					resource.TestCheckResourceAttr("redisacl_user.test", "name", "testuser4_renamed"),
@@ -141,7 +141,7 @@ func TestAccACLUserResource_Delete(t *testing.T) {
 		CheckDestroy:             testAccCheckACLUserDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUserResourceConfig_basic("testuser5"),
+				Config: testAccACLUserResourceConfigBasic("testuser5"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckACLUserExists("redisacl_user.test"),
 					resource.TestCheckResourceAttr("redisacl_user.test", "name", "testuser5"),
@@ -159,7 +159,7 @@ func TestAccACLUserResource_ImportState(t *testing.T) {
 		Steps: []resource.TestStep{
 			// First create the resource normally
 			{
-				Config: testAccACLUserResourceConfig_import("importuser"),
+				Config: testAccACLUserResourceConfigImport("importuser"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckACLUserExists("redisacl_user.import_test"),
 					resource.TestCheckResourceAttr("redisacl_user.import_test", "name", "importuser"),
@@ -183,7 +183,7 @@ func TestAccACLUserResource_WithPassword(t *testing.T) {
 		CheckDestroy:             testAccCheckACLUserDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccACLUserResourceConfig_withPassword("testuser6", "password123"),
+				Config: testAccACLUserResourceConfigWithPassword("testuser6", "password123"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckACLUserExists("redisacl_user.test"),
 					resource.TestCheckResourceAttr("redisacl_user.test", "name", "testuser6"),
@@ -191,7 +191,7 @@ func TestAccACLUserResource_WithPassword(t *testing.T) {
 				),
 			},
 			{
-				Config: testAccACLUserResourceConfig_withPassword("testuser6", "newpassword456"),
+				Config: testAccACLUserResourceConfigWithPassword("testuser6", "newpassword456"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckACLUserExists("redisacl_user.test"),
 					resource.TestCheckResourceAttr("redisacl_user.test", "name", "testuser6"),
@@ -208,7 +208,7 @@ func TestAccACLUserResource_InvalidConfig(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      testAccACLUserResourceConfig_invalid(),
+				Config:      testAccACLUserResourceConfigInvalid(),
 				ExpectError: regexp.MustCompile("Missing required argument"),
 			},
 		},
@@ -264,7 +264,7 @@ func testAccCheckACLUserDestroy(s *terraform.State) error {
 }
 
 func testAccCheckACLUserDoesNotExist(username string) resource.TestCheckFunc {
-	return func(s *terraform.State) error {
+	return func(_ *terraform.State) error {
 		ctx := context.Background()
 		exists, err := UserExists(ctx, username)
 		if err != nil {
@@ -281,7 +281,7 @@ func testAccCheckACLUserDoesNotExist(username string) resource.TestCheckFunc {
 
 // Config helper functions
 
-func testAccACLUserResourceConfig_basic(name string) string {
+func testAccACLUserResourceConfigBasic(name string) string {
 	return fmt.Sprintf(`
 provider "redisacl" {}
 
@@ -295,7 +295,7 @@ resource "redisacl_user" "test" {
 `, name)
 }
 
-func testAccACLUserResourceConfig_withPermissions(name, keys, channels, commands string) string {
+func testAccACLUserResourceConfigWithPermissions(name, keys, channels, commands string) string {
 	return fmt.Sprintf(`
 provider "redisacl" {}
 
@@ -309,7 +309,7 @@ resource "redisacl_user" "test" {
 `, name, keys, channels, commands)
 }
 
-func testAccACLUserResourceConfig_withPassword(name, password string) string {
+func testAccACLUserResourceConfigWithPassword(name, password string) string {
 	return fmt.Sprintf(`
 provider "redisacl" {}
 
@@ -324,7 +324,7 @@ resource "redisacl_user" "test" {
 `, name, password)
 }
 
-func testAccACLUserResourceConfig_import(name string) string {
+func testAccACLUserResourceConfigImport(name string) string {
 	return fmt.Sprintf(`
 provider "redisacl" {}
 
@@ -338,7 +338,7 @@ resource "redisacl_user" "import_test" {
 `, name)
 }
 
-func testAccACLUserResourceConfig_invalid() string {
+func testAccACLUserResourceConfigInvalid() string {
 	return `
 provider "redisacl" {}
 

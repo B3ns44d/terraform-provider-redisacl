@@ -18,7 +18,7 @@ LDFLAGS = -ldflags "-s -w -X main.version=$(VERSION) -X main.commit=$(shell git 
 BUILD_FLAGS = -trimpath $(LDFLAGS)
 
 # Tools
-GOLANGCI_LINT_VERSION = v1.55.2
+GOLANGCI_LINT_VERSION = latest
 TFPLUGINDOCS_VERSION = latest
 
 # Colors for output

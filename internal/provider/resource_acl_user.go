@@ -43,11 +43,11 @@ type ACLUserResourceModel struct {
 	AllowSelfMutation types.Bool   `tfsdk:"allow_self_mutation"`
 }
 
-func (r *ACLUserResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *ACLUserResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_user"
 }
 
-func (r *ACLUserResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *ACLUserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Redis ACL user.",
 
@@ -101,7 +101,7 @@ func (r *ACLUserResource) Schema(ctx context.Context, req resource.SchemaRequest
 	}
 }
 
-func (r *ACLUserResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *ACLUserResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
 		return

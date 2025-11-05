@@ -96,8 +96,8 @@ jobs:
         run: make test-all
 
       - name: Upload coverage reports
-        if: matrix.go-version == '1.24' && matrix.terraform-version == '1.6.*'
-        uses: codecov/codecov-action@v3
+        if: matrix.go-version == '1.23' && matrix.terraform-version == '1.6.*'
+        uses: codecov/codecov-action@v4
         with:
           file: ./coverage/coverage.out
           flags: unittests

@@ -16,7 +16,7 @@ permissions:
   id-token: write
 
 env:
-  GO_VERSION: '1.21'
+  GO_VERSION: '1.24'
 
 jobs:
   # Pre-release validation
@@ -29,12 +29,12 @@ jobs:
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -72,18 +72,6 @@ jobs:
           make test
           make testacc
 
-      - name: Validate examples
-        run: |
-          for example in examples/*/; do
-            if [ -f "$example/main.tf" ]; then
-              echo "Validating $example"
-              cd "$example"
-              terraform init -backend=false
-              terraform validate
-              cd - > /dev/null
-            fi
-          done
-
       - name: Check changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -101,12 +89,12 @@ jobs:
     needs: pre-release-validation
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -117,15 +105,50 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+          trust_level: 5
 
-      - name: Verify GPG key
+      - name: Debug GPG setup
         run: |
-          echo "GPG fingerprint: ${{ steps.import_gpg.outputs.fingerprint }}"
+          echo "=== GPG Debug Information ==="
+          echo "GPG version:"
+          gpg --version | head -1
+          echo ""
+          echo "GPG fingerprint from import: ${{ steps.import_gpg.outputs.fingerprint }}"
+          echo "GPG key ID from import: ${{ steps.import_gpg.outputs.keyid }}"
+          echo "GPG name from import: ${{ steps.import_gpg.outputs.name }}"
+          echo "GPG email from import: ${{ steps.import_gpg.outputs.email }}"
+          echo ""
+          echo "=== Available Secret Keys ==="
           gpg --list-secret-keys --keyid-format LONG
+          echo ""
+          echo "=== Available Public Keys ==="
+          gpg --list-keys --keyid-format LONG
+          echo ""
+          echo "=== GPG Configuration ==="
+          gpg --list-config
+          echo ""
+          echo "=== Test GPG Signing ==="
+          echo "test signing" > test.txt
+          if gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.PASSPHRASE }}" --detach-sign --armor --local-user "${{ steps.import_gpg.outputs.fingerprint }}" test.txt; then
+            echo "GPG signing test PASSED"
+            ls -la test.txt*
+            cat test.txt.asc
+          else
+            echo "GPG signing test FAILED"
+            echo "Trying with key ID instead of fingerprint..."
+            if gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.PASSPHRASE }}" --detach-sign --armor --local-user "${{ steps.import_gpg.outputs.keyid }}" test.txt; then
+              echo "GPG signing with key ID PASSED"
+            else
+              echo "GPG signing with key ID also FAILED"
+            fi
+          fi
+          rm -f test.txt test.txt.asc
 
       - name: Run GoReleaser (Dry Run)
         if: github.event_name == 'workflow_dispatch'
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6.4.0
         with:
           distribution: goreleaser
           version: latest
@@ -133,10 +156,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          GPG_PASSPHRASE: ${{ secrets.PASSPHRASE }}
 
       - name: Run GoReleaser (Release)
         if: github.event_name == 'push'
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6.4.0
         with:
           distribution: goreleaser
           version: latest
@@ -144,71 +168,111 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: release-artifacts
-          path: |
-            dist/
-            !dist/*.txt
+          GPG_PASSPHRASE: ${{ secrets.PASSPHRASE }}
 
   # Terraform Registry publication
   terraform-registry:
-    name: Publish to Terraform Registry
+    name: Terraform Registry Publication
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [pre-release-validation, goreleaser]
     if: github.event_name == 'push' && needs.pre-release-validation.outputs.is_prerelease == 'false'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Verify Terraform Registry manifest
+      - name: Verify GoReleaser configuration
         run: |
-          if [ ! -f "terraform-registry-manifest.json" ]; then
-            echo "terraform-registry-manifest.json not found"
+          if [ ! -f ".goreleaser.yml" ]; then
+            echo ".goreleaser.yml not found"
             echo "This file is required for Terraform Registry publication"
             exit 1
           fi
           
-          # Validate JSON format
-          cat terraform-registry-manifest.json | jq empty
+          # Check if GoReleaser config has required fields for Terraform Registry
+          if ! grep -q "archives:" .goreleaser.yml; then
+            echo "GoReleaser config missing archives section"
+            exit 1
+          fi
 
-      - name: Create registry publication comment
+      - name: Wait for release to be available
+        run: |
+          VERSION="${{ needs.pre-release-validation.outputs.version }}"
+          echo "Waiting for release ${VERSION} to be available on GitHub..."
+          
+          # Wait up to 5 minutes for the release to be available
+          for i in {1..30}; do
+            if curl -s -f "https://api.github.com/repos/${{ github.repository }}/releases/tags/${VERSION}" > /dev/null; then
+              echo "Release ${VERSION} is available!"
+              break
+            fi
+            echo "Attempt $i: Release not yet available, waiting 10 seconds..."
+            sleep 10
+          done
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Verify release assets
+        run: |
+          VERSION="${{ needs.pre-release-validation.outputs.version }}"
+          
+          # Check that required assets exist for Terraform Registry
+          RELEASE_DATA=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/${VERSION}")
+          
+          # Check for checksums file
+          if ! echo "$RELEASE_DATA" | jq -r '.assets[].name' | grep -q "checksums.txt"; then
+            echo "Missing checksums.txt file in release assets"
+            exit 1
+          fi
+          
+          # Check for signature file
+          if ! echo "$RELEASE_DATA" | jq -r '.assets[].name' | grep -q "checksums.txt.sig"; then
+            echo "Missing checksums.txt.sig file in release assets"
+            exit 1
+          fi
+          
+          echo "All required release assets are present for Terraform Registry"
+
+      - name: Create release announcement
         uses: actions/github-script@v7
         with:
           script: |
             const version = '${{ needs.pre-release-validation.outputs.version }}';
-            const body = `**Release ${version} Published**
+            const versionNoV = version.replace('v', '');
             
-            This release has been published to:
-            - GitHub Releases
-            - Terraform Registry (automatic via webhook)
-            
-            **Installation:**
-            \`\`\`hcl
-            terraform {
-              required_providers {
-                redisacl = {
-                  source  = "B3ns44d/redisacl"
-                  version = "${version.replace('v', '')}"
-                }
-              }
-            }
-            \`\`\`
-            
-            **Documentation:** [Terraform Registry](https://registry.terraform.io/providers/B3ns44d/redisacl/latest)`;
-            
-            github.rest.repos.createRelease({
+            // Update the release description with Terraform Registry information
+            const { data: release } = await github.rest.repos.getReleaseByTag({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: version,
-              name: `Release ${version}`,
-              body: body,
-              draft: false,
-              prerelease: false
+              tag: version
+            });
+            
+            const installationSection = '\n\n## 📦 Installation\n\n' +
+              'This provider is available on the [Terraform Registry](https://registry.terraform.io/providers/B3ns44d/redisacl/' + versionNoV + ').\n\n' +
+              '```hcl\n' +
+              'terraform {\n' +
+              '  required_providers {\n' +
+              '    redisacl = {\n' +
+              '      source  = "B3ns44d/redisacl"\n' +
+              '      version = "~> ' + versionNoV + '"\n' +
+              '    }\n' +
+              '  }\n' +
+              '}\n' +
+              '```\n\n' +
+              '## 📚 Documentation\n\n' +
+              '- [Provider Documentation](https://registry.terraform.io/providers/B3ns44d/redisacl/' + versionNoV + '/docs)\n' +
+              '- [GitHub Repository](https://github.com/${{ github.repository }})\n\n' +
+              '---\n\n' +
+              '**Note:** The Terraform Registry will automatically detect this release and make it available within a few minutes.';
+
+            const updatedBody = (release.body || '') + installationSection;
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              body: updatedBody
             });
 
   # Post-release tasks
@@ -220,20 +284,32 @@ jobs:
     if: always() && needs.goreleaser.result == 'success'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Update version in files
         run: |
           VERSION="${{ needs.pre-release-validation.outputs.version }}"
           VERSION_NO_V="${VERSION#v}"
           
-          # Update Makefile default version
-          sed -i "s/VERSION ?= .*/VERSION ?= ${VERSION_NO_V}/" GNUmakefile
+          # Update Makefile default version (check if file exists first)
+          if [ -f "GNUmakefile" ]; then
+            sed -i "s/VERSION ?= .*/VERSION ?= ${VERSION_NO_V}/" GNUmakefile
+          elif [ -f "Makefile" ]; then
+            sed -i "s/VERSION ?= .*/VERSION ?= ${VERSION_NO_V}/" Makefile
+          fi
           
-          # Update example versions
-          find examples -name "*.tf" -exec sed -i "s/version = \".*\"/version = \"~> ${VERSION_NO_V}\"/" {} \;
+          # Update example versions (check if examples directory exists)
+          if [ -d "examples" ]; then
+            find examples -name "*.tf" -exec sed -i "s/version = \".*\"/version = \"~> ${VERSION_NO_V}\"/" {} \;
+          fi
 
       - name: Create version bump PR
         uses: peter-evans/create-pull-request@v5

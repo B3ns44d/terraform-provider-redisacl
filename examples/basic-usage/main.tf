@@ -5,7 +5,7 @@ terraform {
   required_providers {
     redisacl = {
       source  = "B3ns44d/redisacl"
-      version = "~> 0.1.0"
+      version = "1.0.1"
     }
   }
 }
@@ -13,6 +13,7 @@ terraform {
 # Configure the provider for local Redis
 provider "redisacl" {
   address  = "localhost:6379"
+  username = "redis" # Change this to your Redis username
   password = "your-redis-password" # Change this to your Redis password
 }
 

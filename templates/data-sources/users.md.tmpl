@@ -1,0 +1,28 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderName}}"
+subcategory: ""
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+```terraform
+# Get all Redis ACL users
+data "redisacl_users" "all" {}
+
+# Output user information
+output "user_count" {
+  value = length(data.redisacl_users.all.users)
+}
+
+output "user_names" {
+  value = [for user in data.redisacl_users.all.users : user.name]
+}
+```
+
+{{ .SchemaMarkdown | trimspace }}

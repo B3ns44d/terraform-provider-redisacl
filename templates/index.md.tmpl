@@ -1,0 +1,92 @@
+---
+page_title: "Provider: {{.ProviderShortName}}"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.ProviderShortName}} Provider
+
+The Redis ACL provider allows Terraform to manage Redis Access Control Lists (ACLs). This provider supports Redis 6.0+ ACL features including user management, permissions, and access controls.
+
+## Example Usage
+
+{{ tffile "examples/basic-usage/main.tf" }}
+
+## Authentication
+
+The provider supports multiple authentication methods:
+
+### Basic Authentication
+```terraform
+provider "redisacl" {
+  address  = "localhost:6379"
+  username = "admin"
+  password = "password"
+}
+```
+
+### TLS Configuration
+```terraform
+provider "redisacl" {
+  address  = "redis.example.com:6380"
+  use_tls  = true
+  username = "admin"
+  password = "password"
+  
+  # Optional: Custom CA certificate
+  tls_ca_cert = file("ca.pem")
+  
+  # Optional: Client certificate for mutual TLS
+  tls_cert = file("client.pem")
+  tls_key  = file("client-key.pem")
+}
+```
+
+### Redis Cluster
+```terraform
+provider "redisacl" {
+  cluster {
+    addresses = [
+      "node1.redis.example.com:6379",
+      "node2.redis.example.com:6379",
+      "node3.redis.example.com:6379"
+    ]
+    username = "admin"
+    password = "password"
+  }
+}
+```
+
+### Redis Sentinel
+```terraform
+provider "redisacl" {
+  sentinel {
+    addresses = [
+      "sentinel1.redis.example.com:26379",
+      "sentinel2.redis.example.com:26379",
+      "sentinel3.redis.example.com:26379"
+    ]
+    master_name = "mymaster"
+    username    = "admin"
+    password    = "password"
+  }
+}
+```
+
+> **⚠️ Important:** Redis does not automatically replicate ACL users to replica nodes. In Sentinel setups, when a failover occurs, the newly promoted master will not have the ACL users created by this provider. Consider using Redis Cluster or implementing ACL synchronization mechanisms for high-availability scenarios.
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Environment Variables
+
+The following environment variables can be used as defaults:
+
+- `REDIS_ADDRESS` - Redis server address
+- `REDIS_USERNAME` - Redis username
+- `REDIS_PASSWORD` - Redis password
+- `REDIS_USE_TLS` - Enable TLS (true/false)
+
+## Requirements
+
+- Redis 6.0 or later (ACL support required)
+- Terraform 1.0 or later

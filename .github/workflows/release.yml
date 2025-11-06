@@ -220,15 +220,18 @@ jobs:
           # Check that required assets exist for Terraform Registry
           RELEASE_DATA=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/${VERSION}")
           
-          # Check for checksums file
-          if ! echo "$RELEASE_DATA" | jq -r '.assets[].name' | grep -q "checksums.txt"; then
-            echo "Missing checksums.txt file in release assets"
+          # Check for checksums file (pattern: PROJECT_VERSION_SHA256SUMS)
+          EXPECTED_CHECKSUM="terraform-provider-redisacl_${VERSION#v}_SHA256SUMS"
+          if ! echo "$RELEASE_DATA" | jq -r '.assets[].name' | grep -q "$EXPECTED_CHECKSUM"; then
+            echo "Missing $EXPECTED_CHECKSUM file in release assets"
+            echo "Available assets:"
+            echo "$RELEASE_DATA" | jq -r '.assets[].name'
             exit 1
           fi
           
           # Check for signature file
-          if ! echo "$RELEASE_DATA" | jq -r '.assets[].name' | grep -q "checksums.txt.sig"; then
-            echo "Missing checksums.txt.sig file in release assets"
+          if ! echo "$RELEASE_DATA" | jq -r '.assets[].name' | grep -q "${EXPECTED_CHECKSUM}.sig"; then
+            echo "Missing ${EXPECTED_CHECKSUM}.sig file in release assets"
             exit 1
           fi
           
@@ -275,62 +278,7 @@ jobs:
               body: updatedBody
             });
 
-  # Post-release tasks
-  post-release:
-    name: Post-Release Tasks
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: [pre-release-validation, goreleaser, terraform-registry]
-    if: always() && needs.goreleaser.result == 'success'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Update version in files
-        run: |
-          VERSION="${{ needs.pre-release-validation.outputs.version }}"
-          VERSION_NO_V="${VERSION#v}"
-          
-          # Update Makefile default version (check if file exists first)
-          if [ -f "GNUmakefile" ]; then
-            sed -i "s/VERSION ?= .*/VERSION ?= ${VERSION_NO_V}/" GNUmakefile
-          elif [ -f "Makefile" ]; then
-            sed -i "s/VERSION ?= .*/VERSION ?= ${VERSION_NO_V}/" Makefile
-          fi
-          
-          # Update example versions (check if examples directory exists)
-          if [ -d "examples" ]; then
-            find examples -name "*.tf" -exec sed -i "s/version = \".*\"/version = \"~> ${VERSION_NO_V}\"/" {} \;
-          fi
-
-      - name: Create version bump PR
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: bump version to ${{ needs.pre-release-validation.outputs.version }}"
-          title: "chore: bump version to ${{ needs.pre-release-validation.outputs.version }}"
-          body: |
-            Automated version bump after release ${{ needs.pre-release-validation.outputs.version }}
-            
-            Changes:
-            - Updated default version in Makefile
-            - Updated version constraints in examples
-          branch: chore/version-bump-${{ needs.pre-release-validation.outputs.version }}
-          delete-branch: true
-
-      - name: Notify on success
-        run: |
-          echo "Release ${{ needs.pre-release-validation.outputs.version }} completed successfully!"
-          echo "Artifacts published to GitHub Releases"
-          echo "Provider available on Terraform Registry"
 
   # Failure notification
   release-failure:
@@ -345,4 +293,5 @@ jobs:
           echo "Pre-release validation: ${{ needs.pre-release-validation.result }}"
           echo "GoReleaser: ${{ needs.goreleaser.result }}"
           echo "Terraform Registry: ${{ needs.terraform-registry.result }}"
+          exit 1
           exit 1

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-11-06
+
+### Added
+- Generated comprehensive documentation for Terraform Registry
+- Provider, resource, and data source documentation with examples
+- Auto-generated schema documentation using terraform-plugin-docs
+
+### Fixed
+- GoReleaser checksum file naming to follow Terraform Registry requirements
+- GPG signing configuration for release artifacts
+- Workflow improvements for better release reliability
+
+### Changed
+- Removed post-release automation tasks for cleaner release process
+- Updated release workflow to handle proper checksum verification
+
 ## [1.0.0] - 2025-11-04
 
 ### Added

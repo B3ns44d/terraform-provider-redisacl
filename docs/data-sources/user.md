@@ -27,7 +27,7 @@ terraform {
 # Configure the provider for local Redis
 provider "redisacl" {
   address  = "localhost:6379"
-  username = "redis" # Change this to your Redis username
+  username = "redis"               # Change this to your Redis username
   password = "your-redis-password" # Change this to your Redis password
 }
 

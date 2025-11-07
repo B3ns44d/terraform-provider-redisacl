@@ -30,7 +30,7 @@ func StartRedisContainer(ctx context.Context) error {
 	}
 
 	req := testcontainers.ContainerRequest{
-		Image:        "redis:7-alpine",
+		Image:        "redis:7.4.7-alpine",
 		ExposedPorts: []string{"6379/tcp"},
 		Cmd:          []string{"redis-server", "--requirepass", "testpass"},
 		WaitingFor: wait.ForAll(
@@ -244,5 +244,26 @@ func CreateTestUserWithSelectors(ctx context.Context, username, password string)
 	defer func() { _ = client.Close() }()
 
 	rules := []string{"reset", "on", ">" + password, "~*", "&*", "+@all", "(~key* +get)", "(~data* +set)"}
+	return client.ACLSetUser(ctx, username, rules...).Err()
+}
+
+// ModifyUserInRedis modifies a user in Redis with the given rules
+func ModifyUserInRedis(ctx context.Context, username string, rules []string) error {
+	if redisHost == "" || redisPort == "" {
+		return fmt.Errorf("redis container not started")
+	}
+
+	port, err := strconv.Atoi(redisPort)
+	if err != nil {
+		return fmt.Errorf("invalid port: %w", err)
+	}
+
+	client := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", redisHost, port),
+		Password: "testpass",
+		DB:       0,
+	})
+	defer func() { _ = client.Close() }()
+
 	return client.ACLSetUser(ctx, username, rules...).Err()
 }

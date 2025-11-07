@@ -13,8 +13,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - State comparison logic updated to recognize equivalent command configurations
 - Improved ACL command rule building to avoid duplicate `-@all` prefixes
 
+### Added
+- Comprehensive test suite with HIGH and MEDIUM priority tests
+  - **Unit Tests**: 13 test cases for helper functions covering:
+    - ACL rule building with various parameter combinations
+    - Commands with/without `-@all` prefix handling
+    - Multiple passwords, keys, and channel patterns
+    - Selectors and complex command combinations
+    - Edge cases (null values, empty strings)
+  - **Acceptance Tests**: 10 new integration tests covering:
+    - Commands drift detection (with/without `-@all` prefix)
+    - Multiple password management and rotation
+    - Disabled user state management
+    - Nopass user handling
+    - Complex command combinations (@read, @write, etc.)
+    - Multiple key and channel patterns
+    - State drift detection and correction
+- Helper function `ModifyUserInRedis()` for drift testing
+
 ### Changed
 - Updated version in GNUmakefile to 1.0.2
+- Enhanced test coverage for critical provider functionality
 
 ### Documentation
 - Added important limitation notice about Redis ACL replication in Sentinel setups

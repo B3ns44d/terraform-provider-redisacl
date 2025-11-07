@@ -348,3 +348,421 @@ resource "redisacl_user" "test" {
 }
 `
 }
+
+func TestAccACLUserResource_CommandsWithoutDashAllPrefix(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigCommandsWithoutDashAll("drift_test_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "drift_test_user"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "commands", "+get +set"),
+				),
+			},
+			// Apply again to ensure no drift detected
+			{
+				Config: testAccACLUserResourceConfigCommandsWithoutDashAll("drift_test_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "commands", "+get +set"),
+				),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_CommandsWithDashAllPrefix(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigCommandsWithDashAll("prefix_test_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "prefix_test_user"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "commands", "-@all +get +set"),
+				),
+			},
+			// Apply again to ensure no drift detected
+			{
+				Config: testAccACLUserResourceConfigCommandsWithDashAll("prefix_test_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "commands", "-@all +get +set"),
+				),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_MultiplePasswords(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigMultiplePasswords("multipass_user", []string{"pass1", "pass2"}),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "multipass_user"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "passwords.#", "2"),
+				),
+			},
+			// Add a third password
+			{
+				Config: testAccACLUserResourceConfigMultiplePasswords("multipass_user", []string{"pass1", "pass2", "pass3"}),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "passwords.#", "3"),
+				),
+			},
+			// Remove one password
+			{
+				Config: testAccACLUserResourceConfigMultiplePasswords("multipass_user", []string{"pass1", "pass3"}),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "passwords.#", "2"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_PasswordRotation(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigWithPassword("rotation_user", "oldpassword"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "passwords.#", "1"),
+				),
+			},
+			// Rotate to new password
+			{
+				Config: testAccACLUserResourceConfigWithPassword("rotation_user", "newpassword"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "passwords.#", "1"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_DisabledUser(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigDisabled("disabled_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "disabled_user"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "enabled", "false"),
+				),
+			},
+			// Enable the user
+			{
+				Config: testAccACLUserResourceConfigBasic("disabled_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "enabled", "true"),
+				),
+			},
+			// Disable again
+			{
+				Config: testAccACLUserResourceConfigDisabled("disabled_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "enabled", "false"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_NoPassword(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigNoPassword("nopass_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "nopass_user"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "passwords.#", "0"),
+				),
+			},
+			// Add a password
+			{
+				Config: testAccACLUserResourceConfigWithPassword("nopass_user", "newpassword"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "passwords.#", "1"),
+				),
+			},
+			// Remove password (back to nopass)
+			{
+				Config: testAccACLUserResourceConfigNoPassword("nopass_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "passwords.#", "0"),
+				),
+			},
+		},
+	})
+}
+
+// Config helper functions for new tests
+
+func testAccACLUserResourceConfigCommandsWithoutDashAll(name string) string {
+	return fmt.Sprintf(`
+provider "redisacl" {}
+
+resource "redisacl_user" "test" {
+  name     = "%s"
+  enabled  = true
+  keys     = "~*"
+  channels = "&*"
+  commands = "+get +set"
+}
+`, name)
+}
+
+func testAccACLUserResourceConfigCommandsWithDashAll(name string) string {
+	return fmt.Sprintf(`
+provider "redisacl" {}
+
+resource "redisacl_user" "test" {
+  name     = "%s"
+  enabled  = true
+  keys     = "~*"
+  channels = "&*"
+  commands = "-@all +get +set"
+}
+`, name)
+}
+
+func testAccACLUserResourceConfigMultiplePasswords(name string, passwords []string) string {
+	passwordList := ""
+	for i, pass := range passwords {
+		if i > 0 {
+			passwordList += ", "
+		}
+		passwordList += fmt.Sprintf(`"%s"`, pass)
+	}
+
+	return fmt.Sprintf(`
+provider "redisacl" {}
+
+resource "redisacl_user" "test" {
+  name      = "%s"
+  enabled   = true
+  passwords = [%s]
+  keys      = "~*"
+  channels  = "&*"
+  commands  = "+@all"
+}
+`, name, passwordList)
+}
+
+func testAccACLUserResourceConfigDisabled(name string) string {
+	return fmt.Sprintf(`
+provider "redisacl" {}
+
+resource "redisacl_user" "test" {
+  name     = "%s"
+  enabled  = false
+  keys     = "~*"
+  channels = "&*"
+  commands = "+@all"
+}
+`, name)
+}
+
+func testAccACLUserResourceConfigNoPassword(name string) string {
+	return fmt.Sprintf(`
+provider "redisacl" {}
+
+resource "redisacl_user" "test" {
+  name      = "%s"
+  enabled   = true
+  passwords = []
+  keys      = "~*"
+  channels  = "&*"
+  commands  = "+@all"
+}
+`, name)
+}
+
+func TestAccACLUserResource_ComplexCommandCombinations(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigComplexCommands("complex_user", "-@all +@read +@write -del"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "complex_user"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "commands", "-@all +@read +@write -del"),
+				),
+			},
+			// Update to different command combination
+			{
+				Config: testAccACLUserResourceConfigComplexCommands("complex_user", "-@all +@string +@hash +@list"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "commands", "-@all +@string +@hash +@list"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_MultipleKeyPatterns(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigMultipleKeys("multikey_user", "~app:* ~cache:* ~session:*"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "multikey_user"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "keys", "~app:* ~cache:* ~session:*"),
+				),
+			},
+			// Update key patterns
+			{
+				Config: testAccACLUserResourceConfigMultipleKeys("multikey_user", "~app:* ~data:*"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "keys", "~app:* ~data:*"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_MultipleChannelPatterns(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigMultipleChannels("multichan_user", "&notifications:* &events:* &alerts:*"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "multichan_user"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "channels", "&notifications:* &events:* &alerts:*"),
+				),
+			},
+			// Update channel patterns
+			{
+				Config: testAccACLUserResourceConfigMultipleChannels("multichan_user", "&notifications:*"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "channels", "&notifications:*"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_StateDrift(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigBasic("drift_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "drift_user"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "keys", "~*"),
+				),
+			},
+			{
+				// Manually modify the user in Redis, then apply again
+				PreConfig: func() {
+					ctx := context.Background()
+					err := ModifyUserInRedis(ctx, "drift_user", []string{"reset", "on", "~modified:*", "&*", "+@all"})
+					if err != nil {
+						t.Fatalf("Failed to modify user in Redis: %v", err)
+					}
+				},
+				// Apply again - Terraform should detect drift and fix it
+				Config: testAccACLUserResourceConfigBasic("drift_user"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExists("redisacl_user.test"),
+					// After apply, should be back to configured value
+					resource.TestCheckResourceAttr("redisacl_user.test", "keys", "~*"),
+				),
+			},
+		},
+	})
+}
+
+func testAccACLUserResourceConfigComplexCommands(name, commands string) string {
+	return fmt.Sprintf(`
+provider "redisacl" {}
+
+resource "redisacl_user" "test" {
+  name     = "%s"
+  enabled  = true
+  keys     = "~*"
+  channels = "&*"
+  commands = "%s"
+}
+`, name, commands)
+}
+
+func testAccACLUserResourceConfigMultipleKeys(name, keys string) string {
+	return fmt.Sprintf(`
+provider "redisacl" {}
+
+resource "redisacl_user" "test" {
+  name     = "%s"
+  enabled  = true
+  keys     = "%s"
+  channels = "&*"
+  commands = "+@all"
+}
+`, name, keys)
+}
+
+func testAccACLUserResourceConfigMultipleChannels(name, channels string) string {
+	return fmt.Sprintf(`
+provider "redisacl" {}
+
+resource "redisacl_user" "test" {
+  name     = "%s"
+  enabled  = true
+  keys     = "~*"
+  channels = "%s"
+  commands = "+@all"
+}
+`, name, channels)
+}

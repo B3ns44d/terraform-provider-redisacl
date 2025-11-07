@@ -187,6 +187,21 @@ func (r *ACLUserResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	// If the commands in the state and from the API only differ by the
+	// "-@all " prefix, keep the state as is to prevent drift.
+	var state ACLUserResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	stateCommands := state.Commands.ValueString()
+	dataCommands := data.Commands.ValueString()
+
+	if stateCommands != dataCommands && dataCommands == "-@all "+stateCommands {
+		data.Commands = state.Commands
+	}
+
 	// Ensure ID is set
 	data.ID = data.Name
 

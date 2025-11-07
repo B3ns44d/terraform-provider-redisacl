@@ -50,8 +50,11 @@ func buildACLSetUserRules(data *ACLUserResourceModel) []string {
 	}
 
 	if !data.Commands.IsNull() {
-		rules = append(rules, "-@all")
-		rules = append(rules, strings.Fields(data.Commands.ValueString())...)
+		commands := data.Commands.ValueString()
+		if !strings.HasPrefix(commands, "-@all") {
+			rules = append(rules, "-@all")
+		}
+		rules = append(rules, strings.Fields(commands)...)
 	} else {
 		rules = append(rules, "+@all")
 	}

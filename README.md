@@ -133,6 +133,8 @@ provider "redisacl" {
 }
 ```
 
+> **⚠️ Important Limitation:** Redis does not automatically replicate ACL users to replica nodes. In Sentinel setups, when a failover occurs, the newly promoted master will not have the ACL users created by this provider. For high-availability scenarios requiring ACL persistence across failovers, consider using Redis Cluster instead or implementing external ACL synchronization mechanisms.
+
 #### Redis Cluster
 
 ```hcl

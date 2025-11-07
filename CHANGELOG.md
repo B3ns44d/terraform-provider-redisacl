@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2025-11-07
+
+### Fixed
+- Fixed Terraform state drift when commands attribute doesn't include `-@all` prefix
+  - Provider now intelligently handles `-@all` prefix to prevent unnecessary updates
+  - State comparison logic updated to recognize equivalent command configurations
+- Improved ACL command rule building to avoid duplicate `-@all` prefixes
+
+### Changed
+- Updated version in GNUmakefile to 1.0.2
+
+### Documentation
+- Added important limitation notice about Redis ACL replication in Sentinel setups
+- Clarified that ACL users are not automatically replicated to replica nodes during failover
+- Recommended using Redis Cluster for high-availability scenarios requiring ACL persistence
+
 ## [1.0.1] - 2025-11-06
 
 ### Added

@@ -766,3 +766,236 @@ resource "redisacl_user" "test" {
 }
 `, name, channels)
 }
+
+// Valkey Backend Tests
+
+func TestAccACLUserResource_Create_Valkey(t *testing.T) {
+	ctx := context.Background()
+
+	// Start Valkey container
+	if err := StartValkeyContainer(ctx); err != nil {
+		t.Fatalf("Failed to start Valkey container: %v", err)
+	}
+	defer func() {
+		if err := StopValkeyContainer(ctx); err != nil {
+			t.Logf("Failed to stop Valkey container: %v", err)
+		}
+	}()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckValkey(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroyValkey,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigBasicValkey("valkey_testuser1"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExistsValkey("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "valkey_testuser1"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "enabled", "true"),
+					resource.TestCheckResourceAttrSet("redisacl_user.test", "name"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_Read_Valkey(t *testing.T) {
+	ctx := context.Background()
+
+	// Start Valkey container
+	if err := StartValkeyContainer(ctx); err != nil {
+		t.Fatalf("Failed to start Valkey container: %v", err)
+	}
+	defer func() {
+		if err := StopValkeyContainer(ctx); err != nil {
+			t.Logf("Failed to stop Valkey container: %v", err)
+		}
+	}()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckValkey(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroyValkey,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigBasicValkey("valkey_testuser2"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExistsValkey("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "valkey_testuser2"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "enabled", "true"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:            "redisacl_user.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"passwords", "allow_self_mutation"},
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_Update_Valkey(t *testing.T) {
+	ctx := context.Background()
+
+	// Start Valkey container
+	if err := StartValkeyContainer(ctx); err != nil {
+		t.Fatalf("Failed to start Valkey container: %v", err)
+	}
+	defer func() {
+		if err := StopValkeyContainer(ctx); err != nil {
+			t.Logf("Failed to stop Valkey container: %v", err)
+		}
+	}()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckValkey(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroyValkey,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigWithPermissionsValkey("valkey_testuser3", "~key1", "&channel1", "+get"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExistsValkey("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "valkey_testuser3"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "keys", "~key1"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "channels", "&channel1"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "commands", "-@all +get"),
+				),
+			},
+			{
+				Config: testAccACLUserResourceConfigWithPermissionsValkey("valkey_testuser3", "~key2", "&channel2", "+set"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExistsValkey("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "valkey_testuser3"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "keys", "~key2"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "channels", "&channel2"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "commands", "-@all +set"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUserResource_Delete_Valkey(t *testing.T) {
+	ctx := context.Background()
+
+	// Start Valkey container
+	if err := StartValkeyContainer(ctx); err != nil {
+		t.Fatalf("Failed to start Valkey container: %v", err)
+	}
+	defer func() {
+		if err := StopValkeyContainer(ctx); err != nil {
+			t.Logf("Failed to stop Valkey container: %v", err)
+		}
+	}()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckValkey(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACLUserDestroyValkey,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUserResourceConfigBasicValkey("valkey_testuser5"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckACLUserExistsValkey("redisacl_user.test"),
+					resource.TestCheckResourceAttr("redisacl_user.test", "name", "valkey_testuser5"),
+				),
+			},
+		},
+	})
+}
+
+// Valkey Helper functions
+
+func testAccPreCheckValkey(t *testing.T) {
+	if valkeyHost == "" || valkeyPort == "" {
+		t.Fatal("Valkey container not started")
+	}
+}
+
+func testAccCheckACLUserExistsValkey(resourceName string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[resourceName]
+		if !ok {
+			return fmt.Errorf("Not found: %s", resourceName)
+		}
+
+		if rs.Primary.ID == "" {
+			return fmt.Errorf("No ACL User ID is set")
+		}
+
+		ctx := context.Background()
+		exists, err := UserExistsInValkey(ctx, rs.Primary.ID)
+		if err != nil {
+			return fmt.Errorf("Error checking if user exists in Valkey: %w", err)
+		}
+
+		if !exists {
+			return fmt.Errorf("ACL User %s does not exist in Valkey", rs.Primary.ID)
+		}
+
+		return nil
+	}
+}
+
+func testAccCheckACLUserDestroyValkey(s *terraform.State) error {
+	ctx := context.Background()
+
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "redisacl_user" {
+			continue
+		}
+
+		exists, err := UserExistsInValkey(ctx, rs.Primary.ID)
+		if err != nil {
+			return fmt.Errorf("Error checking if user exists in Valkey: %w", err)
+		}
+
+		if exists {
+			return fmt.Errorf("ACL User %s still exists in Valkey", rs.Primary.ID)
+		}
+	}
+
+	return nil
+}
+
+// Valkey Config helper functions
+
+func testAccACLUserResourceConfigBasicValkey(name string) string {
+	return fmt.Sprintf(`
+provider "redisacl" {
+  address    = "%s:%s"
+  password   = "testpass"
+  use_valkey = true
+}
+
+resource "redisacl_user" "test" {
+  name     = "%s"
+  enabled  = true
+  keys     = "~*"
+  channels = "&*"
+  commands = "+@all"
+}
+`, valkeyHost, valkeyPort, name)
+}
+
+func testAccACLUserResourceConfigWithPermissionsValkey(name, keys, channels, commands string) string {
+	return fmt.Sprintf(`
+provider "redisacl" {
+  address    = "%s:%s"
+  password   = "testpass"
+  use_valkey = true
+}
+
+resource "redisacl_user" "test" {
+  name     = "%s"
+  enabled  = true
+  keys     = "%s"
+  channels = "%s"
+  commands = "-@all %s"
+}
+`, valkeyHost, valkeyPort, name, keys, channels, commands)
+}

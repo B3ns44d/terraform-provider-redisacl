@@ -130,7 +130,7 @@ func (r *ACLUserResource) Create(ctx context.Context, req resource.CreateRequest
 
 	rules := buildACLSetUserRules(&data)
 
-	err := r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
+	err := r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create ACL user, got error: %s", err))
 		return
@@ -154,7 +154,7 @@ func (r *ACLUserResource) Read(ctx context.Context, req resource.ReadRequest, re
 	r.redisClient.mutex.Lock()
 	defer r.redisClient.mutex.Unlock()
 
-	result, err := r.redisClient.client.Do(ctx, "ACL", "GETUSER", data.Name.ValueString()).Result()
+	result, err := r.redisClient.client.Do(ctx, "ACL", "GETUSER", data.Name.ValueString())
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			resp.State.RemoveResource(ctx)
@@ -167,8 +167,15 @@ func (r *ACLUserResource) Read(ctx context.Context, req resource.ReadRequest, re
 	var val []interface{}
 	switch res := result.(type) {
 	case []interface{}:
+		// Redis format
 		val = res
 	case map[interface{}]interface{}:
+		// Valkey format with interface{} keys
+		for k, v := range res {
+			val = append(val, k, v)
+		}
+	case map[string]interface{}:
+		// Valkey format with string keys
 		for k, v := range res {
 			val = append(val, k, v)
 		}
@@ -219,7 +226,7 @@ func (r *ACLUserResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	// Check for self-mutation
 	if !data.AllowSelfMutation.ValueBool() {
-		result, err := r.redisClient.client.Do(ctx, "ACL", "WHOAMI").Result()
+		result, err := r.redisClient.client.Do(ctx, "ACL", "WHOAMI")
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get current user, got error: %s", err))
 			return
@@ -237,7 +244,7 @@ func (r *ACLUserResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	rules := buildACLSetUserRules(&data)
 
-	err := r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
+	err := r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update ACL user, got error: %s", err))
 		return
@@ -260,7 +267,7 @@ func (r *ACLUserResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	// Check for self-mutation
 	if !data.AllowSelfMutation.ValueBool() {
-		result, err := r.redisClient.client.Do(ctx, "ACL", "WHOAMI").Result()
+		result, err := r.redisClient.client.Do(ctx, "ACL", "WHOAMI")
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get current user, got error: %s", err))
 			return
@@ -276,7 +283,7 @@ func (r *ACLUserResource) Delete(ctx context.Context, req resource.DeleteRequest
 		}
 	}
 
-	err := r.redisClient.client.ACLDelUser(ctx, data.Name.ValueString()).Err()
+	err := r.redisClient.client.ACLDelUser(ctx, data.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete ACL user, got error: %s", err))
 		return

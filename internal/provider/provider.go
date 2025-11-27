@@ -8,7 +8,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -16,13 +15,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/redis/go-redis/v9"
 )
 
 // This is the struct we'll pass to datasources and resources.
 type RedisClient struct {
-	client redis.UniversalClient
+	client UniversalClient
 	mutex  *sync.Mutex
 }
 
@@ -42,6 +39,7 @@ type RedisACLProviderModel struct {
 	Address               types.String `tfsdk:"address"`
 	Username              types.String `tfsdk:"username"`
 	Password              types.String `tfsdk:"password"`
+	UseValkey             types.Bool   `tfsdk:"use_valkey"`
 	UseTLS                types.Bool   `tfsdk:"use_tls"`
 	TLSCACert             types.String `tfsdk:"tls_ca_cert"`
 	TLSCert               types.String `tfsdk:"tls_cert"`
@@ -84,6 +82,10 @@ func (p *RedisACLProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				MarkdownDescription: "The password for Redis authentication.",
 				Optional:            true,
 				Sensitive:           true,
+			},
+			"use_valkey": schema.BoolAttribute{
+				MarkdownDescription: "Whether to use Valkey instead of Redis as the backend. When set to `true`, the provider will use the Valkey Glide client. When set to `false` or omitted, the provider will use the Redis client (default behavior).",
+				Optional:            true,
 			},
 			"use_tls": schema.BoolAttribute{
 				MarkdownDescription: "Whether to use TLS for the connection.",
@@ -162,6 +164,8 @@ func (p *RedisACLProvider) Configure(ctx context.Context, req provider.Configure
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Build TLS configuration if enabled
 	var tlsConfig *tls.Config
 	if data.UseTLS.ValueBool() {
 		tlsConfig = &tls.Config{
@@ -187,82 +191,48 @@ func (p *RedisACLProvider) Configure(ctx context.Context, req provider.Configure
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 	}
-	var client redis.UniversalClient
-	// Override with REDIS_URL environment variable if set
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL != "" {
-		opts, err := redis.ParseURL(redisURL)
+
+	// Determine which client to create based on use_valkey flag
+	var client UniversalClient
+	var err error
+	useValkey := data.UseValkey.ValueBool()
+
+	if useValkey {
+		// Create Valkey client
+		client, err = createValkeyClient(ctx, data, tlsConfig)
 		if err != nil {
-			resp.Diagnostics.AddError("Client Configuration", fmt.Sprintf("Invalid Redis URL: %s", err))
+			resp.Diagnostics.AddError("Valkey Client Configuration",
+				fmt.Sprintf("Unable to create Valkey client: %s", err))
 			return
 		}
-		if tlsConfig != nil {
-			opts.TLSConfig = tlsConfig
-		}
-		client = redis.NewClient(opts)
-	} else if !data.Sentinel.IsNull() {
-		// Sentinel configuration
-		var sentinelModel SentinelModel
-		resp.Diagnostics.Append(data.Sentinel.As(ctx, &sentinelModel, basetypes.ObjectAsOptions{})...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		var sentinelAddrs []string
-		for _, addr := range sentinelModel.Addresses {
-			sentinelAddrs = append(sentinelAddrs, addr.ValueString())
-		}
-		opts := &redis.FailoverOptions{
-			MasterName:       sentinelModel.MasterName.ValueString(),
-			SentinelAddrs:    sentinelAddrs,
-			SentinelUsername: sentinelModel.Username.ValueString(),
-			SentinelPassword: sentinelModel.Password.ValueString(),
-			Username:         data.Username.ValueString(),
-			Password:         data.Password.ValueString(),
-			TLSConfig:        tlsConfig,
-		}
-		client = redis.NewFailoverClient(opts)
-	} else if !data.Cluster.IsNull() {
-		// Cluster configuration
-		var clusterModel ClusterModel
-		resp.Diagnostics.Append(data.Cluster.As(ctx, &clusterModel, basetypes.ObjectAsOptions{})...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		var clusterAddrs []string
-		for _, addr := range clusterModel.Addresses {
-			clusterAddrs = append(clusterAddrs, addr.ValueString())
-		}
-		opts := &redis.ClusterOptions{
-			Addrs:     clusterAddrs,
-			Username:  data.Username.ValueString(),
-			Password:  data.Password.ValueString(),
-			TLSConfig: tlsConfig,
-		}
-		client = redis.NewClusterClient(opts)
 	} else {
-		// Single instance configuration
-		address := "localhost:6379"
-		if !data.Address.IsNull() {
-			address = data.Address.ValueString()
+		// Create Redis client (default behavior)
+		client, err = createRedisClient(ctx, data, tlsConfig)
+		if err != nil {
+			resp.Diagnostics.AddError("Redis Client Configuration",
+				fmt.Sprintf("Unable to create Redis client: %s", err))
+			return
 		}
-		opts := &redis.Options{
-			Addr:      address,
-			Username:  data.Username.ValueString(),
-			Password:  data.Password.ValueString(),
-			TLSConfig: tlsConfig,
-		}
-		client = redis.NewClient(opts)
 	}
-	// Check the connection
-	_, err := client.Ping(ctx).Result()
+
+	// Test connection with backend-specific error message
+	_, err = client.Ping(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Configuration", fmt.Sprintf("Unable to connect to Redis: %s", err))
+		backendType := "Redis"
+		if useValkey {
+			backendType = "Valkey"
+		}
+		resp.Diagnostics.AddError("Client Configuration",
+			fmt.Sprintf("Unable to connect to %s: %s", backendType, err))
 		return
 	}
+
+	// Create RedisClient wrapper with the universal client interface
 	redisClient := &RedisClient{
 		client: client,
 		mutex:  &sync.Mutex{},
 	}
+
 	resp.DataSourceData = redisClient
 	resp.ResourceData = redisClient
 }

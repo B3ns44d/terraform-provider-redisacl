@@ -109,7 +109,7 @@ func (d *ACLUserDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	// resource and data source of the same type are used in the same configuration.
 	// The result from ACL GETUSER can be a map, so we read it as such and convert
 	// to the flat slice our parser expects.
-	result, err := d.redisClient.client.Do(ctx, "ACL", "GETUSER", data.Name.ValueString()).Result()
+	result, err := d.redisClient.client.Do(ctx, "ACL", "GETUSER", data.Name.ValueString())
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("ACL user %s not found", data.Name.ValueString()))
@@ -119,20 +119,35 @@ func (d *ACLUserDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	resultMap, ok := result.(map[interface{}]interface{})
-	if !ok {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to parse ACL GETUSER response: unexpected type %T", result))
-		return
-	}
-
-	if len(resultMap) == 0 {
+	// Handle nil result (user not found in Valkey)
+	if result == nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("ACL user %s not found", data.Name.ValueString()))
 		return
 	}
 
 	var val []interface{}
-	for k, v := range resultMap {
-		val = append(val, k, v)
+	switch res := result.(type) {
+	case []interface{}:
+		// Redis format
+		val = res
+	case map[interface{}]interface{}:
+		// Valkey format with interface{} keys
+		for k, v := range res {
+			val = append(val, k, v)
+		}
+	case map[string]interface{}:
+		// Valkey format with string keys
+		for k, v := range res {
+			val = append(val, k, v)
+		}
+	default:
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to parse ACL GETUSER response: unexpected type %T", result))
+		return
+	}
+
+	if len(val) == 0 {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("ACL user %s not found", data.Name.ValueString()))
+		return
 	}
 
 	temp := &ACLUserResourceModel{}

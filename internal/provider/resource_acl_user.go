@@ -324,22 +324,22 @@ func (r *ACLUserResource) ImportState(ctx context.Context, req resource.ImportSt
 // - If there's a connection or other error, returns (false, error)
 func (r *ACLUserResource) checkUserExists(ctx context.Context, username string) (bool, error) {
 	result, err := r.redisClient.client.Do(ctx, "ACL", "GETUSER", username)
-	
+
 	// Check if result is nil (user doesn't exist)
 	if result == nil {
 		return false, nil
 	}
-	
+
 	if err != nil {
 		// Check for Redis Nil error (user doesn't exist in Redis)
 		if errors.Is(err, redis.Nil) {
 			return false, nil
 		}
-		
+
 		// Connection or other error
 		return false, fmt.Errorf("failed to check if user exists: %w", err)
 	}
-	
+
 	// User exists
 	return true, nil
 }

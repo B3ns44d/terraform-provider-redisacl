@@ -1095,26 +1095,6 @@ func TestAccACLUserResource_ErrorMessageFormat(t *testing.T) {
 	})
 }
 
-// Config helper for invalid connection test
-func testAccACLUserResourceConfigInvalidConnection(name string) string {
-	return fmt.Sprintf(`
-provider "redisacl" {
-  address  = "invalid-host:9999"
-  password = "testpass"
-}
-
-resource "redisacl_user" "test" {
-  name     = "%s"
-  enabled  = true
-  keys     = "~*"
-  channels = "&*"
-  commands = "+@all"
-}
-`, name)
-}
-
-
-
 // TestAccACLUserResource_UserAlreadyExists_Valkey tests that attempting to create
 // a user that already exists in Valkey returns an error with import instructions
 func TestAccACLUserResource_UserAlreadyExists_Valkey(t *testing.T) {

@@ -12,7 +12,7 @@ require (
 	github.com/redis/go-redis/v9 v9.14.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
-	github.com/testcontainers/testcontainers-go/modules/valkey v0.39.0
+	github.com/testcontainers/testcontainers-go/modules/valkey v0.40.0
 	github.com/valkey-io/valkey-glide/go/v2 v2.1.1
 )
 

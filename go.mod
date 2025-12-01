@@ -13,7 +13,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/valkey v0.39.0
-	github.com/valkey-io/valkey-glide/go/v2 v2.1.1
+	github.com/valkey-io/valkey-glide/go/v2 v2.2.0
 )
 
 require (

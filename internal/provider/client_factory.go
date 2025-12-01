@@ -116,7 +116,7 @@ func createValkeyClient(ctx context.Context, data RedisACLProviderModel, tlsConf
 
 // createValkeyStandaloneClient creates a standalone Valkey client with address parsing,
 // authentication, and TLS support.
-func createValkeyStandaloneClient(ctx context.Context, data RedisACLProviderModel, tlsConfig *tls.Config) (UniversalClient, error) {
+func createValkeyStandaloneClient(_ context.Context, data RedisACLProviderModel, tlsConfig *tls.Config) (UniversalClient, error) {
 	// Get address from configuration or use default
 	address := "localhost:6379"
 	if !data.Address.IsNull() {

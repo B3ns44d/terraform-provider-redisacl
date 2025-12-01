@@ -128,9 +128,32 @@ func (r *ACLUserResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	// Check if user already exists before attempting creation
+	username := data.Name.ValueString()
+	exists, err := r.checkUserExists(ctx, username)
+	if err != nil {
+		// Connection or other error
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to check if user exists, got error: %s", err))
+		return
+	}
+	if exists {
+		// User already exists - return error with import instructions
+		errorMsg := fmt.Sprintf(
+			"ACL user \"%s\" already exists\n\n"+
+				"This user exists but is not managed by Terraform. To manage this user with\n"+
+				"Terraform, please import it first:\n\n"+
+				"  terraform import redisacl_user.<resource_name> %s\n\n"+
+				"Example:\n"+
+				"  terraform import redisacl_user.my_user %s",
+			username, username, username,
+		)
+		resp.Diagnostics.AddError("User Already Exists", errorMsg)
+		return
+	}
+
 	rules := buildACLSetUserRules(&data)
 
-	err := r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...)
+	err = r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create ACL user, got error: %s", err))
 		return
@@ -292,4 +315,31 @@ func (r *ACLUserResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 func (r *ACLUserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+}
+
+// checkUserExists queries Redis/Valkey to determine if a user exists.
+// Returns (exists bool, err error).
+// - If the user exists, returns (true, nil)
+// - If the user doesn't exist (redis.Nil or Valkey error), returns (false, nil)
+// - If there's a connection or other error, returns (false, error)
+func (r *ACLUserResource) checkUserExists(ctx context.Context, username string) (bool, error) {
+	result, err := r.redisClient.client.Do(ctx, "ACL", "GETUSER", username)
+
+	// Check if result is nil (user doesn't exist)
+	if result == nil {
+		return false, nil
+	}
+
+	if err != nil {
+		// Check for Redis Nil error (user doesn't exist in Redis)
+		if errors.Is(err, redis.Nil) {
+			return false, nil
+		}
+
+		// Connection or other error
+		return false, fmt.Errorf("failed to check if user exists: %w", err)
+	}
+
+	// User exists
+	return true, nil
 }

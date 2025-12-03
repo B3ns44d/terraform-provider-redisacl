@@ -454,8 +454,8 @@ github.com/tklauser/go-sysconf v0.3.14 h1:g5vzr9iPFFz24v2KZXs/pvpvh8/V9Fw6vQK5ZZ
 github.com/tklauser/go-sysconf v0.3.14/go.mod h1:1ym4lWMLUOhuBOPGtRcJm7tEGX4SCYNEEEtghGG/8uY=
 github.com/tklauser/numcpus v0.8.0 h1:Mx4Wwe/FjZLeQsK/6kt2EOepwwSl7SmJrK5bV/dXYgY=
 github.com/tklauser/numcpus v0.8.0/go.mod h1:ZJZlAY+dmR4eut8epnzf0u/VwodKmryxR8txiloSqBE=
-github.com/valkey-io/valkey-glide/go/v2 v2.1.1 h1:78eoWXIYLbse0ZpspKRMwbREj0+Tkoc/qkSR8H9iRsc=
-github.com/valkey-io/valkey-glide/go/v2 v2.1.1/go.mod h1:LK5zmODJa5xnxZndarh1trntExb3GVGJXz4GwDCagho=
+github.com/valkey-io/valkey-glide/go/v2 v2.2.1 h1:4jvBntSTQeoy5Or9UWN5h5hgDZO1FFLEOeksATc7oCY=
+github.com/valkey-io/valkey-glide/go/v2 v2.2.1/go.mod h1:LK5zmODJa5xnxZndarh1trntExb3GVGJXz4GwDCagho=
 github.com/valkey-io/valkey-go v1.0.59 h1:W67Z0UY+Qqk3k8NKkFCFlM3X4yQUniixl7dSJAch2Qo=
 github.com/valkey-io/valkey-go v1.0.59/go.mod h1:bHmwjIEOrGq/ubOJfh5uMRs7Xj6mV3mQ/ZXUbmqpjqY=
 github.com/vmihailenco/msgpack v3.3.3+incompatible/go.mod h1:fy3FlTQTDXWkZ7Bh6AcGMlsjHatGryHQYUTf1ShIgkk=

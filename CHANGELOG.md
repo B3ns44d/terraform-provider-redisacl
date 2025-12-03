@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2025-12-03
+
 ### Added
 - **Valkey Backend Support**: Provider now supports Valkey as an alternative backend to Redis
   - New `use_valkey` boolean configuration option to enable Valkey backend (default: `false`)
@@ -15,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - TLS support for secure Valkey connections
   - Unified client interface abstracts differences between Redis and Valkey backends
   - Comprehensive acceptance test suite for Valkey backend validation
+- **User Existence Check**: Added validation to prevent accidental overwrite of existing ACL users
+  - Provider now checks if a user already exists before creation
+  - Prevents unintentional modification of manually created or externally managed users
+  - Improves safety when managing ACL users in shared Redis/Valkey environments
 
 ### Changed
 - Refactored client architecture to use `UniversalClient` interface for backend abstraction

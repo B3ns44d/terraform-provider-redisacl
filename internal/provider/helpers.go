@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -81,15 +82,52 @@ func parseACLUser(acl []interface{}, data *ACLUserResourceModel, diags *diag.Dia
 
 		switch key {
 		case "flags":
-			flags, ok := v.([]interface{})
-			if !ok {
-				diags.AddError("Parse Error", "flags not array")
-				return
-			}
-			for _, f := range flags {
-				if f.(string) == "on" {
+			// Handle multiple formats for flags field
+			// Valkey returns flags as a set (map[string]struct{})
+			// Redis returns flags as an array ([]interface{})
+			switch flags := v.(type) {
+			case []interface{}:
+				// Redis format: array of strings
+				for _, f := range flags {
+					if fStr, ok := f.(string); ok && fStr == "on" {
+						data.Enabled = types.BoolValue(true)
+					}
+				}
+			case string:
+				// String format: space-separated
+				if strings.Contains(flags, "on") {
 					data.Enabled = types.BoolValue(true)
 				}
+			case []string:
+				// Alternative array format with string slice
+				for _, f := range flags {
+					if f == "on" {
+						data.Enabled = types.BoolValue(true)
+					}
+				}
+			case map[string]interface{}:
+				// Valkey set format: map with string keys and any values
+				if _, exists := flags["on"]; exists {
+					data.Enabled = types.BoolValue(true)
+				}
+			case map[string]struct{}:
+				// Valkey set format: map with string keys and empty struct values
+				if _, exists := flags["on"]; exists {
+					data.Enabled = types.BoolValue(true)
+				}
+			case map[interface{}]interface{}:
+				// Set format: map with interface{} keys
+				for k := range flags {
+					if kStr, ok := k.(string); ok && kStr == "on" {
+						data.Enabled = types.BoolValue(true)
+						break
+					}
+				}
+			case nil:
+				// Skip nil flags
+			default:
+				diags.AddError("Parse Error", fmt.Sprintf("flags has unexpected type: %T", v))
+				return
 			}
 		case "passwords":
 			// Skip passwords

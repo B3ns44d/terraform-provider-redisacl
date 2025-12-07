@@ -107,15 +107,29 @@ func (d *ACLUsersDataSource) Read(ctx context.Context, req datasource.ReadReques
 	d.redisClient.mutex.Lock()
 	defer d.redisClient.mutex.Unlock()
 
-	usernames, err := d.redisClient.client.Do(ctx, "ACL", "USERS").StringSlice()
+	usersResult, err := d.redisClient.client.Do(ctx, "ACL", "USERS")
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to list ACL users, got error: %s", err))
 		return
 	}
 
+	// Convert result to string slice
+	usersSlice, ok := usersResult.([]interface{})
+	if !ok {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to parse ACL USERS response: unexpected type %T", usersResult))
+		return
+	}
+
+	var usernames []string
+	for _, u := range usersSlice {
+		if username, ok := u.(string); ok {
+			usernames = append(usernames, username)
+		}
+	}
+
 	data.Users = []ACLUserDataSourceModel{}
 	for _, username := range usernames {
-		result, err := d.redisClient.client.Do(ctx, "ACL", "GETUSER", username).Result()
+		result, err := d.redisClient.client.Do(ctx, "ACL", "GETUSER", username)
 		if err != nil {
 			if !errors.Is(err, redis.Nil) {
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get ACL user %s, got error: %s", username, err))
@@ -126,8 +140,15 @@ func (d *ACLUsersDataSource) Read(ctx context.Context, req datasource.ReadReques
 		var userVal []interface{}
 		switch res := result.(type) {
 		case []interface{}:
+			// Redis format
 			userVal = res
 		case map[interface{}]interface{}:
+			// Valkey format with interface{} keys
+			for k, v := range res {
+				userVal = append(userVal, k, v)
+			}
+		case map[string]interface{}:
+			// Valkey format with string keys
 			for k, v := range res {
 				userVal = append(userVal, k, v)
 			}

@@ -3,12 +3,13 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/B3ns44d/terraform-provider-redisacl)](https://goreportcard.com/report/github.com/B3ns44d/terraform-provider-redisacl)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 
-A comprehensive [Terraform](https://www.terraform.io/) provider for managing Redis Access Control Lists (ACLs). This provider supports standalone, Sentinel, and Cluster Redis deployments with full TLS support.
+A comprehensive [Terraform](https://www.terraform.io/) provider for managing Redis and Valkey Access Control Lists (ACLs). This provider supports standalone, Sentinel, and Cluster Redis deployments, as well as Valkey standalone and cluster modes, with full TLS support.
 
 ## Features
 
-- **Complete ACL Management**: Create, read, update, and delete Redis ACL users
-- **Multiple Deployment Types**: Supports Standalone, Sentinel, and Cluster Redis
+- **Complete ACL Management**: Create, read, update, and delete Redis and Valkey ACL users
+- **Multiple Deployment Types**: Supports Standalone, Sentinel, and Cluster Redis; Standalone and Cluster Valkey
+- **Valkey Support**: Optional Valkey backend support with seamless configuration switching
 - **Security First**: Full TLS and mutual TLS (mTLS) support
 - **Data Sources**: Read individual users or list all users
 - **Comprehensive Testing**: 14+ test cases with testcontainers-go integration
@@ -25,7 +26,7 @@ terraform {
   required_providers {
     redisacl = {
       source  = "B3ns44d/redisacl"
-      version = "~> 0.1.0"
+      version = "1.0.3"
     }
   }
 }
@@ -151,6 +152,58 @@ provider "redisacl" {
   }
 }
 ```
+
+#### Valkey Backend
+
+The provider supports [Valkey](https://valkey.io/), an open-source key-value data store and Redis fork. To use Valkey as the backend, set `use_valkey = true` in the provider configuration. When omitted or set to `false`, the provider defaults to Redis.
+
+**Standalone Valkey:**
+
+```hcl
+provider "redisacl" {
+  address    = "localhost:6379"
+  password   = "your-password"
+  use_valkey = true
+}
+```
+
+**Valkey with TLS:**
+
+```hcl
+provider "redisacl" {
+  address    = "secure-valkey.example.com:6380"
+  password   = "your-password"
+  use_valkey = true
+  use_tls    = true
+  
+  tls_ca_cert = file("ca.pem")
+  tls_cert    = file("client.crt")
+  tls_key     = file("client.key")
+}
+```
+
+**Valkey Cluster:**
+
+```hcl
+provider "redisacl" {
+  username   = "cluster-user"
+  password   = "cluster-password"
+  use_valkey = true
+  
+  cluster {
+    addresses = [
+      "node1.example.com:6379",
+      "node2.example.com:6379",
+      "node3.example.com:6379"
+    ]
+  }
+}
+```
+
+**Valkey Backend Limitations:**
+
+- **Sentinel Mode Not Supported**: The Valkey backend does not support Sentinel configuration. Use standalone or cluster modes instead.
+- **API Compatibility**: While Valkey maintains Redis API compatibility, some edge cases may behave differently. Please report any issues on GitHub.
 
 ### Resources
 
@@ -417,8 +470,9 @@ This project is licensed under the Mozilla Public License 2.0 - see the [LICENSE
 
 - [HashiCorp Terraform Plugin Framework](https://github.com/hashicorp/terraform-plugin-framework)
 - [go-redis](https://github.com/redis/go-redis) - Redis client for Go
+- [Valkey Glide](https://github.com/valkey-io/valkey-glide) - Valkey client for Go
 - [testcontainers-go](https://github.com/testcontainers/testcontainers-go) - Integration testing with Docker
 
 ---
 
-**Made with ❤️ for the Terraform and Redis communities**
+**Made with ❤️ for the Terraform, Redis, and Valkey communities**

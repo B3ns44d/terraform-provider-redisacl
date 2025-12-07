@@ -6,7 +6,7 @@ description: |-
 
 # {{.ProviderShortName}} Provider
 
-The Redis ACL provider allows Terraform to manage Redis Access Control Lists (ACLs). This provider supports Redis 6.0+ ACL features including user management, permissions, and access controls.
+The Redis ACL provider allows Terraform to manage Redis and Valkey Access Control Lists (ACLs). This provider supports Redis 6.0+ and Valkey ACL features including user management, permissions, and access controls.
 
 ## Example Usage
 
@@ -75,6 +75,50 @@ provider "redisacl" {
 
 > **⚠️ Important:** Redis does not automatically replicate ACL users to replica nodes. In Sentinel setups, when a failover occurs, the newly promoted master will not have the ACL users created by this provider. Consider using Redis Cluster or implementing ACL synchronization mechanisms for high-availability scenarios.
 
+### Valkey Backend
+
+The provider supports Valkey as an alternative backend to Redis. Set `use_valkey = true` to use Valkey instead of Redis.
+
+#### Standalone Valkey
+```terraform
+provider "redisacl" {
+  address    = "localhost:6379"
+  password   = "your-password"
+  use_valkey = true
+}
+```
+
+#### Valkey with TLS
+```terraform
+provider "redisacl" {
+  address     = "secure-valkey.example.com:6380"
+  password    = "your-password"
+  use_valkey  = true
+  use_tls     = true
+  tls_ca_cert = file("ca.pem")
+  tls_cert    = file("client.crt")
+  tls_key     = file("client.key")
+}
+```
+
+#### Valkey Cluster
+```terraform
+provider "redisacl" {
+  username   = "cluster-user"
+  password   = "cluster-password"
+  use_valkey = true
+  cluster {
+    addresses = [
+      "node1.example.com:6379",
+      "node2.example.com:6379",
+      "node3.example.com:6379"
+    ]
+  }
+}
+```
+
+> **⚠️ Note:** Valkey backend does not currently support Sentinel configuration. Use standalone or cluster modes with Valkey.
+
 {{ .SchemaMarkdown | trimspace }}
 
 ## Environment Variables
@@ -88,5 +132,5 @@ The following environment variables can be used as defaults:
 
 ## Requirements
 
-- Redis 6.0 or later (ACL support required)
+- Redis 6.0 or later (ACL support required) or Valkey
 - Terraform 1.0 or later

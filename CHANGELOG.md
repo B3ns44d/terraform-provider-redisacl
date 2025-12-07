@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Valkey Backend Support**: Provider now supports Valkey as an alternative backend to Redis
+  - New `use_valkey` boolean configuration option to enable Valkey backend (default: `false`)
+  - Full compatibility with all existing ACL management operations (create, read, update, delete)
+  - Support for Valkey standalone and cluster deployments
+  - TLS support for secure Valkey connections
+  - Unified client interface abstracts differences between Redis and Valkey backends
+  - Comprehensive acceptance test suite for Valkey backend validation
+
+### Changed
+- Refactored client architecture to use `UniversalClient` interface for backend abstraction
+- Provider maintains full backward compatibility - existing Redis configurations work unchanged
+
+### Documentation
+- Added Valkey configuration examples for standalone, cluster, and TLS setups
+- Documented Valkey backend limitations (Sentinel mode not currently supported)
+- Updated provider schema documentation with `use_valkey` attribute
+
+### Dependencies
+- Added `github.com/valkey-io/valkey-glide/go/v2` for Valkey client support
+
+### Important Notes
+- **No Breaking Changes**: Existing Redis configurations continue to work without modification
+- **Default Behavior**: Provider uses Redis backend by default when `use_valkey` is omitted or set to `false`
+- **Valkey Limitation**: Sentinel configuration is not supported with Valkey backend - use standalone or cluster modes
+
 ## [1.0.2] - 2025-11-07
 
 ### Fixed

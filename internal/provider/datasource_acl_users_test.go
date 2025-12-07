@@ -231,3 +231,235 @@ provider "redisacl" {}
 data "redisacl_users" "test" {}
 `
 }
+
+// Valkey Backend Tests
+
+func TestAccACLUsersDataSource_ReadAll_Valkey(t *testing.T) {
+	ctx := context.Background()
+
+	// Start Valkey container
+	if err := StartValkeyContainer(ctx); err != nil {
+		t.Fatalf("Failed to start Valkey container: %v", err)
+	}
+	defer func() {
+		if err := StopValkeyContainer(ctx); err != nil {
+			t.Logf("Failed to stop Valkey container: %v", err)
+		}
+	}()
+
+	testUsers := []string{"valkey_multi_user_1", "valkey_multi_user_2", "valkey_multi_user_3"}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheckValkey(t)
+			// Create multiple test users after cleanup
+			ctx := context.Background()
+			for _, user := range testUsers {
+				err := CreateTestUserInValkey(ctx, user, "testpass")
+				if err != nil {
+					t.Fatalf("Failed to create test user %s in Valkey: %v", user, err)
+				}
+			}
+		},
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUsersDataSourceConfigReadAllValkey(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Check that we have at least the test users we created (plus default user)
+					resource.TestCheckResourceAttrWith("data.redisacl_users.test", "users.#", func(value string) error {
+						if value == "0" {
+							return fmt.Errorf("Expected at least 1 user, got 0")
+						}
+						return nil
+					}),
+					// Verify that our test users are in the list
+					testAccCheckUsersContain("data.redisacl_users.test", testUsers),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUsersDataSource_WithResources_Valkey(t *testing.T) {
+	ctx := context.Background()
+
+	// Start Valkey container
+	if err := StartValkeyContainer(ctx); err != nil {
+		t.Fatalf("Failed to start Valkey container: %v", err)
+	}
+	defer func() {
+		if err := StopValkeyContainer(ctx); err != nil {
+			t.Logf("Failed to stop Valkey container: %v", err)
+		}
+	}()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckValkey(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUsersDataSourceConfigWithResourcesValkey(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Check that we have at least the users we created via resources
+					resource.TestCheckResourceAttrWith("data.redisacl_users.test", "users.#", func(value string) error {
+						if value == "0" {
+							return fmt.Errorf("Expected at least 1 user, got 0")
+						}
+						return nil
+					}),
+					// Verify specific users exist in the datasource
+					testAccCheckUsersContain("data.redisacl_users.test", []string{"valkey_resource_user_1", "valkey_resource_user_2"}),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUsersDataSource_Empty_Valkey(t *testing.T) {
+	ctx := context.Background()
+
+	// Start Valkey container
+	if err := StartValkeyContainer(ctx); err != nil {
+		t.Fatalf("Failed to start Valkey container: %v", err)
+	}
+	defer func() {
+		if err := StopValkeyContainer(ctx); err != nil {
+			t.Logf("Failed to stop Valkey container: %v", err)
+		}
+	}()
+
+	// Clean up all test users to ensure clean slate
+	_ = CleanupValkeyUsers(ctx)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckValkey(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUsersDataSourceConfigEmptyValkey(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Should have at least the default user
+					resource.TestCheckResourceAttrWith("data.redisacl_users.test", "users.#", func(value string) error {
+						if value == "0" {
+							return fmt.Errorf("Expected at least the default user, got 0")
+						}
+						return nil
+					}),
+					// Verify default user exists
+					testAccCheckUsersContain("data.redisacl_users.test", []string{"default"}),
+				),
+			},
+		},
+	})
+}
+
+func TestAccACLUsersDataSource_UserAttributes_Valkey(t *testing.T) {
+	ctx := context.Background()
+
+	// Start Valkey container
+	if err := StartValkeyContainer(ctx); err != nil {
+		t.Fatalf("Failed to start Valkey container: %v", err)
+	}
+	defer func() {
+		if err := StopValkeyContainer(ctx); err != nil {
+			t.Logf("Failed to stop Valkey container: %v", err)
+		}
+	}()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheckValkey(t)
+			// Create a specific test user after cleanup
+			ctx := context.Background()
+			err := CreateTestUserInValkey(ctx, "valkey_attr_test_user", "testpass")
+			if err != nil {
+				t.Fatalf("Failed to create test user in Valkey: %v", err)
+			}
+		},
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccACLUsersDataSourceConfigUserAttributesValkey(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrWith("data.redisacl_users.test", "users.#", func(value string) error {
+						if value == "0" {
+							return fmt.Errorf("Expected at least 1 user, got 0")
+						}
+						return nil
+					}),
+					// Check that user attributes are properly populated
+					testAccCheckUserAttributesPopulated("data.redisacl_users.test"),
+				),
+			},
+		},
+	})
+}
+
+// Valkey Config helper functions
+
+func testAccACLUsersDataSourceConfigReadAllValkey() string {
+	return fmt.Sprintf(`
+provider "redisacl" {
+  address    = "%s:%s"
+  password   = "testpass"
+  use_valkey = true
+}
+
+data "redisacl_users" "test" {}
+`, valkeyHost, valkeyPort)
+}
+
+func testAccACLUsersDataSourceConfigWithResourcesValkey() string {
+	return fmt.Sprintf(`
+provider "redisacl" {
+  address    = "%s:%s"
+  password   = "testpass"
+  use_valkey = true
+}
+
+resource "redisacl_user" "test1" {
+  name     = "valkey_resource_user_1"
+  enabled  = true
+  keys     = "~key1*"
+  channels = "&*"
+  commands = "+@all"
+}
+
+resource "redisacl_user" "test2" {
+  name     = "valkey_resource_user_2"
+  enabled  = false
+  keys     = "~key2*"
+  channels = "&*"
+  commands = "+@all"
+}
+
+data "redisacl_users" "test" {
+  depends_on = [redisacl_user.test1, redisacl_user.test2]
+}
+`, valkeyHost, valkeyPort)
+}
+
+func testAccACLUsersDataSourceConfigEmptyValkey() string {
+	return fmt.Sprintf(`
+provider "redisacl" {
+  address    = "%s:%s"
+  password   = "testpass"
+  use_valkey = true
+}
+
+data "redisacl_users" "test" {}
+`, valkeyHost, valkeyPort)
+}
+
+func testAccACLUsersDataSourceConfigUserAttributesValkey() string {
+	return fmt.Sprintf(`
+provider "redisacl" {
+  address    = "%s:%s"
+  password   = "testpass"
+  use_valkey = true
+}
+
+data "redisacl_users" "test" {}
+`, valkeyHost, valkeyPort)
+}

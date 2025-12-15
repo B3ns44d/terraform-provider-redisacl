@@ -29,12 +29,12 @@ jobs:
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -89,12 +89,12 @@ jobs:
     needs: pre-release-validation
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -179,7 +179,7 @@ jobs:
     if: github.event_name == 'push' && needs.pre-release-validation.outputs.is_prerelease == 'false'
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Verify GoReleaser configuration
         run: |
@@ -238,7 +238,7 @@ jobs:
           echo "All required release assets are present for Terraform Registry"
 
       - name: Create release announcement
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const version = '${{ needs.pre-release-validation.outputs.version }}';

@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 func buildACLSetUserRules(data *ACLUserResourceModel) []string {
@@ -70,6 +71,7 @@ func buildACLSetUserRules(data *ACLUserResourceModel) []string {
 
 func parseACLUser(acl []interface{}, data *ACLUserResourceModel, diags *diag.Diagnostics) {
 	data.Enabled = types.BoolValue(false)
+	data.Selectors = basetypes.NewListNull(types.StringType)
 
 	for i := 0; i < len(acl); i += 2 {
 		key, ok := acl[i].(string)

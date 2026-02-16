@@ -22,7 +22,7 @@ import (
 
 // This is the struct we'll pass to datasources and resources.
 type RedisClient struct {
-	client redis.UniversalClient
+	client RedisACLClient
 	mutex  *sync.Mutex
 }
 
@@ -52,10 +52,11 @@ type RedisACLProviderModel struct {
 }
 
 type SentinelModel struct {
-	MasterName types.String   `tfsdk:"master_name"`
-	Addresses  []types.String `tfsdk:"addresses"`
-	Username   types.String   `tfsdk:"username"`
-	Password   types.String   `tfsdk:"password"`
+	MasterName         types.String   `tfsdk:"master_name"`
+	Addresses          []types.String `tfsdk:"addresses"`
+	Username           types.String   `tfsdk:"username"`
+	Password           types.String   `tfsdk:"password"`
+	SyncACLsToReplicas types.Bool     `tfsdk:"sync_acls_to_replicas"`
 }
 
 type ClusterModel struct {
@@ -130,6 +131,10 @@ func (p *RedisACLProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 						Optional:            true,
 						Sensitive:           true,
 					},
+					"sync_acls_to_replicas": schema.BoolAttribute{
+						MarkdownDescription: "Propagate ACL configuration to replicas.",
+						Optional:            true,
+					},
 				},
 			},
 			"cluster": schema.SingleNestedAttribute{
@@ -187,7 +192,7 @@ func (p *RedisACLProvider) Configure(ctx context.Context, req provider.Configure
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 	}
-	var client redis.UniversalClient
+	var client RedisACLClient
 	// Override with REDIS_URL environment variable if set
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL != "" {
@@ -220,7 +225,12 @@ func (p *RedisACLProvider) Configure(ctx context.Context, req provider.Configure
 			Password:         data.Password.ValueString(),
 			TLSConfig:        tlsConfig,
 		}
-		client = redis.NewFailoverClient(opts)
+		if sentinelModel.SyncACLsToReplicas.ValueBool() {
+			client = NewFailoverCompositeClient(ctx, opts)
+		} else {
+			client = redis.NewFailoverClient(opts)
+		}
+
 	} else if !data.Cluster.IsNull() {
 		// Cluster configuration
 		var clusterModel ClusterModel

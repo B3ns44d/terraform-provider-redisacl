@@ -130,7 +130,31 @@ func (r *ACLUserResource) Create(ctx context.Context, req resource.CreateRequest
 
 	rules := buildACLSetUserRules(&data)
 
-	err := r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
+	var err error
+	if cc, ok := r.redisClient.client.(*redis.ClusterClient); ok {
+		err = cc.ForEachShard(ctx, func(ctx context.Context, client *redis.Client) error {
+			err := client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
+			if err != nil {
+				return err
+			}
+
+			err = client.Do(ctx, "ACL", "SAVE").Err()
+			if err != nil {
+				resp.Diagnostics.AddWarning("Client Warning", fmt.Sprintf("Unable to run ACL SAVE, got error: %s", err))
+			}
+			return nil
+		})
+	} else {
+		err = r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
+
+		if err == nil {
+			err = r.redisClient.client.Do(ctx, "ACL", "SAVE").Err()
+			if err != nil {
+				resp.Diagnostics.AddWarning("Client Warning", fmt.Sprintf("Unable to run ACL SAVE, got error: %s", err))
+			}
+		}
+	}
+
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create ACL user, got error: %s", err))
 		return
@@ -237,7 +261,30 @@ func (r *ACLUserResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	rules := buildACLSetUserRules(&data)
 
-	err := r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
+	var err error
+	if cc, ok := r.redisClient.client.(*redis.ClusterClient); ok {
+		err = cc.ForEachShard(ctx, func(ctx context.Context, client *redis.Client) error {
+			err := client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
+			if err != nil {
+				return err
+			}
+			err = client.Do(ctx, "ACL", "SAVE").Err()
+			if err != nil {
+				resp.Diagnostics.AddWarning("Client Warning", fmt.Sprintf("Unable to run ACL SAVE, got error: %s", err))
+			}
+			return nil
+		})
+	} else {
+		err = r.redisClient.client.ACLSetUser(ctx, data.Name.ValueString(), rules...).Err()
+
+		if err == nil {
+			err = r.redisClient.client.Do(ctx, "ACL", "SAVE").Err()
+			if err != nil {
+				resp.Diagnostics.AddWarning("Client Warning", fmt.Sprintf("Unable to run ACL SAVE, got error: %s", err))
+			}
+		}
+	}
+
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update ACL user, got error: %s", err))
 		return
@@ -276,7 +323,30 @@ func (r *ACLUserResource) Delete(ctx context.Context, req resource.DeleteRequest
 		}
 	}
 
-	err := r.redisClient.client.ACLDelUser(ctx, data.Name.ValueString()).Err()
+	var err error
+	if cc, ok := r.redisClient.client.(*redis.ClusterClient); ok {
+		err = cc.ForEachShard(ctx, func(ctx context.Context, client *redis.Client) error {
+			err := client.ACLDelUser(ctx, data.Name.ValueString()).Err()
+			if err != nil {
+				return err
+			}
+			err = client.Do(ctx, "ACL", "SAVE").Err()
+			if err != nil {
+				resp.Diagnostics.AddWarning("Client Warning", fmt.Sprintf("Unable to run ACL SAVE, got error: %s", err))
+			}
+			return nil
+		})
+	} else {
+		err = r.redisClient.client.ACLDelUser(ctx, data.Name.ValueString()).Err()
+
+		if err == nil {
+			err = r.redisClient.client.Do(ctx, "ACL", "SAVE").Err()
+			if err != nil {
+				resp.Diagnostics.AddWarning("Client Warning", fmt.Sprintf("Unable to run ACL SAVE, got error: %s", err))
+			}
+		}
+	}
+
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete ACL user, got error: %s", err))
 		return
